@@ -39,7 +39,7 @@ def main():
     keep_dupes = True if keep_dupes.upper() == "Y" else False
     while True:
         if job == "Playlist":
-            input_URL = input(colored(f"\nCopy-and-paste the URL for the Spotify playlist.\n", "green"))
+            input_URL = input(colored(f"\nCopy-and-paste the URL for the source playlist.\n", "green"))
             parsed_URL = urllib.parse.urlparse(input_URL)
             netloc = parsed_URL.netloc
             path = parsed_URL.path
@@ -50,14 +50,19 @@ def main():
                     sp_playlist_ID = path[10:]
                     sp_scope = "playlist-read-private"
                     sp_client = spotipy.Spotify(auth_manager=SpotifyOAuth(scope=sp_scope))
-                    sp_converter.convert_SP_to_YT_playlist(YTM_CLIENT, sp_client, sp_playlist_ID, keep_dupes)
+                    sp_converter.convert_SP_to_YT_playlist(sp_client, sp_playlist_ID, keep_dupes)
                     return get_run_time()
                 else:
-                    input_URL = input(colored(f"\nMake sure the URL directs to a Spotify playlist.\n", "green"))1
+                    input_URL = input(colored(f"\nMake sure the URL directs to a Spotify playlist.\n", "green"))
             elif netloc == "music.youtube.com":
+                # TODO: Convert single YouTube Music playlist to Spotify playlist
+                yt_converter = YouTubeConverterClass.YouTubeMusicConverter(YTM_CLIENT)
                 if path == "/playlist":
-                    # TODO: Convert single YouTube Music playlist to Spotify playlist
-                    pass
+                    yt_playlist_ID = query[5:]
+                    sp_scope = "playlist-modify-private"
+                    sp_client = spotipy.Spotify(auth_manager=SpotifyOAuth(scope=sp_scope))
+                    yt_converter.convert_YT_to_SP_playlist(sp_client, yt_playlist_ID, keep_dupes)
+                    return get_run_time()
                 else:
                     input_URL = input(colored(f"\nMake sure the URL directs to a YouTube Music playlist.\n", "green"))
             else:
@@ -66,7 +71,7 @@ def main():
             source = input(colored(f"\nType 'S' if the original library is in Spotify or type 'Y' if the original library is in YouTube Music.\n", "green"))
             if source.upper() == "S":
                 sp_converter = SpotifyConverterClass.SpotifyConverter(YTM_CLIENT)
-                sp_converter.convert_SP_to_YT_library(YTM_CLIENT, keep_dupes)
+                sp_converter.convert_SP_to_YT_library(keep_dupes)
                 return get_run_time()
             else:
                 # TODO: Convert YouTube Music library (liked songs, liked albums, all playlists) to Spotify library

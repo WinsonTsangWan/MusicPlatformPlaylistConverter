@@ -40,14 +40,14 @@ class SpotifyConverter():
         sp_client = spotipy.Spotify(auth_manager=SpotifyOAuth(scope=sp_scope))
         sp_playlist_ID = "LIKED_SONGS"
         liked_albums = self.get_all_SP_tracks(sp_client, "LIKED_ALBUMS")
-        self.convert_SP_to_YT_playlist(self.ytm_client, sp_client, sp_playlist_ID, keep_dupes)
+        self.convert_SP_to_YT_playlist(sp_client, sp_playlist_ID, keep_dupes)
 
         # Convert all Spotify playlists to YouTube Music playlists
         sp_scope = "playlist-read-private"
         sp_client = spotipy.Spotify(auth_manager=SpotifyOAuth(scope=sp_scope))
         for sp_playlist in sp_client.current_user_playlists()["items"]:
             sp_playlist_ID = sp_playlist["id"]
-            self.convert_SP_to_YT_playlist(self.ytm_client, sp_client, sp_playlist_ID, keep_dupes)
+            self.convert_SP_to_YT_playlist(sp_client, sp_playlist_ID, keep_dupes)
         
         # Add all Spotify Liked Albums to YouTube Music Liked Albums
         not_added_albums = self.add_SP_liked_albums(liked_albums)
@@ -81,7 +81,7 @@ class SpotifyConverter():
         print(colored(f"\nSpotify playlist detected: '{sp_playlist_name}'", "green"))
         sp_tracks = self.get_all_SP_tracks(sp_client, sp_playlist_ID)
         yt_playlist = {}
-        count = 0
+        count = 1
         print(colored("Copying contents into Youtube playlist...", "green"))
         for sp_track in sp_tracks:
             song = sp_track["track"]
@@ -95,7 +95,6 @@ class SpotifyConverter():
                         yt_playlist[best_match_ID] = {"yt_query":yt_query, "count":1}
                     else:
                         yt_playlist[best_match_ID]["count"] += 1
-                    count += 1
                     print(colored(f"Copying song {count}/{len(sp_tracks)}", "green"))
                 except:
                     if sp_playlist_name not in self.NOT_ADDED:
@@ -103,7 +102,9 @@ class SpotifyConverter():
                     self.NOT_ADDED[sp_playlist_name]["unfound"].append(yt_query)
                     print(f"ERROR: '{yt_query}' not found.")
             except:
-                print(f"ERROR: Song was {type(song)} type. Not a song object.")
+                print(f"ERROR: Song #{count} in Spotify playlist '{sp_playlist_name}' could not be found " 
+                    + f"(It was {type(song)} type. Not a song dict).")
+            count += 1
         yt_playlist_ID = self.create_YT_playlist(yt_playlist, sp_playlist_name, keep_dupes)
         return yt_playlist_ID
 
@@ -140,7 +141,7 @@ class SpotifyConverter():
 
     def get_SP_song_info(self, song: dict) -> dict:
         '''
-        Given a spotify song, summarize important song information into a dictionary
+        Given a Spotify song, summarize important song information into a dictionary
 
         Parameters:
         - (dict) SONG: Spotify song
@@ -157,7 +158,7 @@ class SpotifyConverter():
 
     def find_best_match(self, yt_search_res: list, song_info: dict) -> str:
         '''
-        Given a list of search results and a target song to match, holistically score each 
+        Given a list of YouTube Music search results and a target song to match, holistically score each 
         search result and then return the result with the highest score (ie. the best match).
 
         Parameters:
@@ -166,17 +167,12 @@ class SpotifyConverter():
 
         Return
         - (str) video ID of search result with best holistic score (ie. best match to the song in song_info)
-
-        Note: We use two lists per yt_search_res (found_matches and found_scores) because each
-        res is a dict, which is unhashable (and thus cannot be used as keys in another dict)
         '''
-        found_matches = []
-        found_scores = []
+        found = {}
         while yt_search_res:
             res = yt_search_res.pop(0)
             if res["resultType"] == "song" or res["resultType"] == "video":
-                found_matches.append(res)
-                found_scores.append(0)
+                found[res["videoId"]] = 0
                 res_title = res["title"].lower()
                 res_artist = res["artists"][0]["name"].lower()
                 if "album" in res and res["album"] != None:
@@ -186,32 +182,31 @@ class SpotifyConverter():
                 res_duration = res["duration_seconds"]
                 # Prefer Top result over other results
                 if res["category"] == "Top result":
-                    found_scores[-1] += self.SCORE_COEFFICIENT
+                    found[res["videoId"]] += self.SCORE_COEFFICIENT
                 # Prefer songs over video results
                 if res["resultType"] == "song":
-                    found_scores[-1] += self.SCORE_COEFFICIENT
+                    found[res["videoId"]] += self.SCORE_COEFFICIENT
                 # Prefer results with the exact same name as Spotify song title
                 if song_info["name"] == res_title:
-                    found_scores[-1] += self.SCORE_COEFFICIENT
+                    found[res["videoId"]] += self.SCORE_COEFFICIENT
                 # Slightly prefer results that closely resemble the Spotify song title
                 if song_info["name"] in res_title or res_title in song_info["name"]:
-                    found_scores[-1] += self.SCORE_COEFFICIENT/2
+                    found[res["videoId"]] += self.SCORE_COEFFICIENT/2
                 # Prefer results from the same artist as on Spotify
                 if song_info["artist"] == res_artist:
-                    found_scores[-1] += self.SCORE_COEFFICIENT
+                    found[res["videoId"]] += self.SCORE_COEFFICIENT
                 # Slightly prefer results from artists that closely resemble the Spotify artist
                 if song_info["artist"] in res_artist or res_artist in song_info["artist"]:
-                    found_scores[-1] += self.SCORE_COEFFICIENT/2
+                    found[res["videoId"]] += self.SCORE_COEFFICIENT/2
                 # Prefer results from the same album as on Spotify
                 if res_album and res_album == song_info["album"]:
-                    found_scores[-1] += self.SCORE_COEFFICIENT
+                    found[res["videoId"]] += self.SCORE_COEFFICIENT
                 # Exponentially punish differences in song duration
                 try:
-                    found_scores[-1] -= math.exp(self.EXP_COEFFICIENT*abs(song_info["duration_seconds"]-res_duration))
+                    found[res["videoId"]] -= math.exp(self.EXP_COEFFICIENT*abs(song_info["duration_seconds"]-res_duration))
                 except OverflowError:
-                    found_scores[-1] = float("-inf")
-        best_match = found_matches[found_scores.index(max(found_scores))]
-        best_match_ID = best_match["videoId"]
+                    found[res["videoId"]] = float("-inf")
+        best_match_ID = max(found, key = found.get)
         return best_match_ID
 
     def create_YT_playlist(self, yt_playlist: dict, sp_playlist_name: str, keep_dupes: bool) -> str:
