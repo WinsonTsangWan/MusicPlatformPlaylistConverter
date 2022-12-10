@@ -53,7 +53,7 @@ def main():
                     sp_converter.convert_SP_to_YT_playlist(sp_client, sp_playlist_ID, keep_dupes)
                     return get_run_time()
                 else:
-                    input_URL = input(colored(f"\nMake sure the URL directs to a Spotify playlist.\n", "green"))
+                    print(colored(f"\nERROR: Make sure the URL directs to a Spotify playlist.\n", "green"))
             elif netloc == "music.youtube.com":
                 # TODO: Convert single YouTube Music playlist to Spotify playlist
                 yt_converter = YouTubeConverterClass.YouTubeMusicConverter(YTM_CLIENT)
@@ -64,9 +64,9 @@ def main():
                     yt_converter.convert_YT_to_SP_playlist(sp_client, yt_playlist_ID, keep_dupes)
                     return get_run_time()
                 else:
-                    input_URL = input(colored(f"\nMake sure the URL directs to a YouTube Music playlist.\n", "green"))
+                    print(colored(f"\nERROR: Make sure the URL directs to a YouTube Music playlist.\n", "green"))
             else:
-                input_URL = input(colored(f"\nMake sure the URL directs to either a Spotify or YouTube Music playlist.\n", "green"))
+                input_URL = print(colored(f"\ERROR: Make sure the URL directs to either a Spotify or YouTube Music playlist.\n", "green"))
         elif job == "Library":
             source = input(colored(f"\nType 'S' if the original library is in Spotify or type 'Y' if the original library is in YouTube Music.\n", "green"))
             if source.upper() == "S":
