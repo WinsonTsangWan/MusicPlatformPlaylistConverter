@@ -66,7 +66,7 @@ def main():
                 else:
                     print(colored(f"\nERROR: Make sure the URL directs to a YouTube Music playlist.\n", "green"))
             else:
-                input_URL = print(colored(f"\ERROR: Make sure the URL directs to either a Spotify or YouTube Music playlist.\n", "green"))
+                print(colored(f"\ERROR: Make sure the URL directs to either a Spotify or YouTube Music playlist.\n", "green"))
         elif job == "Library":
             source = input(colored(f"\nType 'S' if the original library is in Spotify or type 'Y' if the original library is in YouTube Music.\n", "green"))
             if source.upper() == "S":
