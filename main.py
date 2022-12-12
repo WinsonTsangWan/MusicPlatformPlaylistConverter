@@ -3,13 +3,14 @@ start_time = time.time()
 import spotipy
 import urllib
 import tkinter as tk
-import SpotifyConverterClass
-import YouTubeConverterClass
 
-from termcolor import colored
-from dotenv import load_dotenv
+from SpotifyConverterClass import SpotifyConverter
+from YouTubeConverterClass import YouTubeMusicConverter
+
 from spotipy.oauth2 import SpotifyOAuth
 from ytmusicapi import YTMusic
+from termcolor import colored
+from dotenv import load_dotenv
 # YTMusic.setup(filepath="headers_auth.json")
 
 load_dotenv()
@@ -45,37 +46,49 @@ def main():
             path = parsed_URL.path
             query = parsed_URL.query
             if netloc == "open.spotify.com":
-                sp_converter = SpotifyConverterClass.SpotifyConverter(YTM_CLIENT)
+                sp_converter = SpotifyConverter(YTM_CLIENT, keep_dupes)
                 if path[:10] == "/playlist/":
                     sp_playlist_ID = path[10:]
                     sp_scope = "playlist-read-private"
                     sp_client = spotipy.Spotify(auth_manager=SpotifyOAuth(scope=sp_scope))
-                    sp_converter.convert_SP_to_YT_playlist(sp_client, sp_playlist_ID, keep_dupes)
+                    sp_converter.convert_SP_to_YT_playlist(sp_client, sp_playlist_ID)
+                    sp_converter.print_not_added()
                     return get_run_time()
                 else:
                     print(colored(f"\nERROR: Make sure the URL directs to a Spotify playlist.\n", "green"))
             elif netloc == "music.youtube.com":
                 # TODO: Convert single YouTube Music playlist to Spotify playlist
-                yt_converter = YouTubeConverterClass.YouTubeMusicConverter(YTM_CLIENT)
+                yt_converter = YouTubeMusicConverter(YTM_CLIENT, keep_dupes)
                 if path == "/playlist":
                     yt_playlist_ID = query[5:]
                     sp_scope = "playlist-modify-private"
                     sp_client = spotipy.Spotify(auth_manager=SpotifyOAuth(scope=sp_scope))
-                    yt_converter.convert_YT_to_SP_playlist(sp_client, yt_playlist_ID, keep_dupes)
+                    yt_converter.convert_YT_to_SP_playlist(sp_client, yt_playlist_ID)
+                    yt_converter.print_not_added()
                     return get_run_time()
                 else:
                     print(colored(f"\nERROR: Make sure the URL directs to a YouTube Music playlist.\n", "green"))
             else:
                 print(colored(f"\ERROR: Make sure the URL directs to either a Spotify or YouTube Music playlist.\n", "green"))
         elif job == "Library":
-            source = input(colored(f"\nType 'S' if the original library is in Spotify or type 'Y' if the original library is in YouTube Music.\n", "green"))
+            source = input(colored(f"\nType 'S' if the original library is in Spotify or" 
+                                    + "type 'Y' if the original library is in YouTube Music.\n", 
+                                    "green"))
             if source.upper() == "S":
-                sp_converter = SpotifyConverterClass.SpotifyConverter(YTM_CLIENT)
-                sp_converter.convert_SP_to_YT_library(keep_dupes)
+                sp_converter = SpotifyConverter(YTM_CLIENT, keep_dupes)
+                sp_converter.convert_SP_to_YT_library()
+                return get_run_time()
+            elif source.upper() == "Y":
+                # TODO: Convert YouTube Music library (liked songs, liked albums, all playlists) to Spotify library
+                input(colored("\nShould we try to add liked videos as well?"
+                            + "Type 'Y' for yes, or 'N' for no." 
+                            + "(Liked songs are always added).\n", 
+                            "green"))
+                yt_converter = YouTubeMusicConverter(YTM_CLIENT, keep_dupes)
+                yt_converter.convert_YT_to_SP_library()
                 return get_run_time()
             else:
-                # TODO: Convert YouTube Music library (liked songs, liked albums, all playlists) to Spotify library
-                pass
+                print(colored("\nMake sure you're entering either 'S' or 'Y'.\n", "green"))
 
 def get_run_time():
     minutes = int((time.time()-start_time)//60)

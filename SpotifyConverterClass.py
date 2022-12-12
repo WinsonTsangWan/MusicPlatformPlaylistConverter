@@ -20,18 +20,17 @@ class SpotifyConverter():
     '''
     NOT_ADDED = {}
 
-    def __init__(self, YTM_CLIENT) -> None:
+    def __init__(self, YTM_CLIENT, KEEP_DUPES) -> None:
         self.ytm_client = YTM_CLIENT
+        self.keep_dupes = KEEP_DUPES
         pass
 
-    def convert_SP_to_YT_library(self, keep_dupes: bool) -> None:
+    def convert_SP_to_YT_library(self) -> None:
         '''
-        Converts current user's library (liked songs and all playlists) to YouTube Music playlists.
-        In order: Liked songs -> Playlists -> Albums
-
+        Converts current user's Spotify library (liked songs, liked albums, all playlists) to 
+        YouTube Music playlists. In order: Liked songs -> Playlists -> Albums\n
         Parameters:
-        - (bool) KEEP_DUPES: add duplicates to new playlist? True : False
-        
+        - None
         Return:
         - None
         '''
@@ -40,20 +39,20 @@ class SpotifyConverter():
         sp_client = spotipy.Spotify(auth_manager=SpotifyOAuth(scope=sp_scope))
         sp_playlist_ID = "LIKED_SONGS"
         liked_albums = self.get_all_SP_tracks(sp_client, "LIKED_ALBUMS")
-        self.convert_SP_to_YT_playlist(sp_client, sp_playlist_ID, keep_dupes)
+        self.convert_SP_to_YT_playlist(sp_client, sp_playlist_ID)
 
         # Convert all Spotify playlists to YouTube Music playlists
         sp_scope = "playlist-read-private"
         sp_client = spotipy.Spotify(auth_manager=SpotifyOAuth(scope=sp_scope))
         for sp_playlist in sp_client.current_user_playlists()["items"]:
             sp_playlist_ID = sp_playlist["id"]
-            self.convert_SP_to_YT_playlist(sp_client, sp_playlist_ID, keep_dupes)
+            self.convert_SP_to_YT_playlist(sp_client, sp_playlist_ID)
         
         # Add all Spotify Liked Albums to YouTube Music Liked Albums
         not_added_albums = self.add_SP_liked_albums(liked_albums)
 
         # Print unadded songs from each playlist
-        self.print_not_added(keep_dupes)
+        self.print_not_added()
 
         # Print unadded Spotify albums
         if not_added_albums:
@@ -62,15 +61,12 @@ class SpotifyConverter():
                 print(f"{index + 1}. {album}")
         return 
 
-    def convert_SP_to_YT_playlist(self, sp_client: spotipy.client, sp_playlist_ID: str, keep_dupes: bool) -> str:
+    def convert_SP_to_YT_playlist(self, sp_client: spotipy.client, sp_playlist_ID: str) -> str:
         '''
-        Given a Spotify playlist ID, create a YouTube Music playlist with the same songs
-        
+        Given a Spotify playlist ID, create a YouTube Music playlist with the same songs\n
         Parameters:
         - (spotipy.client) SP_CLIENT: Spotify API client
-        - (str) SP_PLAYLIST_ID: playlist ID of source Spotify playlist
-        - (bool) KEEP_DUPES: add duplicate song to new playlist? True : False
-        
+        - (str) SP_PLAYLIST_ID: playlist ID of source Spotify playlist\n
         Return:
         - (str) playlist ID for newly created YouTube Music playlist
         '''
@@ -105,7 +101,7 @@ class SpotifyConverter():
                 print(f"ERROR: Song #{count} in Spotify playlist '{sp_playlist_name}' could not be found " 
                     + f"(It was {type(song)} type. Not a song dict).")
             count += 1
-        yt_playlist_ID = self.create_YT_playlist(yt_playlist, sp_playlist_name, keep_dupes)
+        yt_playlist_ID = self.create_YT_playlist(yt_playlist, sp_playlist_name)
         return yt_playlist_ID
 
     def get_all_SP_tracks(self, sp_client: spotipy.client, sp_playlist_ID: str) -> list[dict]:
@@ -209,7 +205,7 @@ class SpotifyConverter():
         best_match_ID = max(found, key = found.get)
         return best_match_ID
 
-    def create_YT_playlist(self, yt_playlist: dict, sp_playlist_name: str, keep_dupes: bool) -> str:
+    def create_YT_playlist(self, yt_playlist: dict, sp_playlist_name: str) -> str:
         '''
         Creates a YouTube playlist and handles duplicates based on KEEP_DUPES.
 
@@ -227,7 +223,7 @@ class SpotifyConverter():
         print(colored("Finishing up...", "green"))
         yt_playlist_ID = self.ytm_client.create_playlist(
             title=f"{sp_playlist_name} (copied from Spotify)",
-            description="Includes duplicates" if keep_dupes else "Does not include duplicates",
+            description="Includes duplicates" if self.keep_dupes else "Does not include duplicates",
             video_ids=list(yt_playlist.keys()))
         
         dupes = []
@@ -236,9 +232,9 @@ class SpotifyConverter():
             if count > 1:
                 for _ in range(count-1):
                     dupes.append(video_ID)
-                    if not keep_dupes:
+                    if not self.keep_dupes:
                         self.NOT_ADDED[sp_playlist_name]["dupes"].append(yt_playlist[video_ID]['yt_query'])
-        if keep_dupes and dupes:
+        if self.keep_dupes and dupes:
             self.ytm_client.add_playlist_items(playlistId=yt_playlist_ID, 
             videoIds=dupes, duplicates=True)
         print(colored("Finished! Youtube Music playlist has been created.\n" 
@@ -289,7 +285,7 @@ class SpotifyConverter():
                     not_added_albums.append(yt_query)
         return not_added_albums
 
-    def print_not_added(self, keep_dupes: bool) -> None:
+    def print_not_added(self) -> None:
         '''
         Prints all songs queries that were not added, either because they could not 
         be found or because they are duplicates, using global variable NOT_ADDED.
@@ -309,7 +305,7 @@ class SpotifyConverter():
                     index += 1
             if index == 1:
                 print("None. All songs were fuound.")
-            if not keep_dupes:
+            if not self.keep_dupes:
                 print(colored("\nThe following songs were duplicates and were not added:\n", "green"))
                 index = 1
                 for playlist in self.NOT_ADDED:
