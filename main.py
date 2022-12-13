@@ -19,12 +19,11 @@ load_dotenv()
 YTM_CLIENT = YTMusic('headers_auth.json')
 
 # TODO:
-# 1. [DONE] convert Spotify playlist to Youtube playlist
-# 2. [DONE] convert Spotify library (liked songs, all playlists, liked albums) to Youtube
-# 3. (?) Add Spotify liked songs to YouTube Music liked songs instead of separate playlist
-# 4. create GUI for easier input handling 
-# 5. convert Youtube playlist to Spotify playlist
-# 6. convert Youtube library of playlists to multiple Spotify playlists
+# 1. (?) Add Spotify liked songs to YouTube Music liked songs instead of separate playlist
+# 2. convert YouTube Music library to Spotify library
+# 3. create GUI for easier user input handling
+# 4. refactor SpotifyConverterClass and YouTubeConverterClass into subclasses of a parent ConverterClass
+# 5. improve score function for matching YouTube Music songs with Spotify results
 
 def main():
     job = input(colored("\nHello! Welcome to the Spotify-Youtube playlist coverter.\n" 
@@ -52,7 +51,8 @@ def main():
                     sp_scope = "playlist-read-private"
                     sp_client = spotipy.Spotify(auth_manager=SpotifyOAuth(scope=sp_scope))
                     sp_converter.convert_SP_to_YT_playlist(sp_client, sp_playlist_ID)
-                    sp_converter.print_not_added()
+                    sp_converter.print_not_added_songs()
+                    sp_converter.print_not_added_albums()
                     return get_run_time()
                 else:
                     print(colored(f"\nERROR: Make sure the URL directs to a Spotify playlist.\n", "green"))
@@ -64,14 +64,15 @@ def main():
                     sp_scope = "playlist-modify-private"
                     sp_client = spotipy.Spotify(auth_manager=SpotifyOAuth(scope=sp_scope))
                     yt_converter.convert_YT_to_SP_playlist(sp_client, yt_playlist_ID)
-                    yt_converter.print_not_added()
+                    yt_converter.print_not_added_songs()
+                    yt_converter.print_not_added_albums()
                     return get_run_time()
                 else:
                     print(colored(f"\nERROR: Make sure the URL directs to a YouTube Music playlist.\n", "green"))
             else:
                 print(colored(f"\ERROR: Make sure the URL directs to either a Spotify or YouTube Music playlist.\n", "green"))
         elif job == "Library":
-            source = input(colored(f"\nType 'S' if the original library is in Spotify or" 
+            source = input(colored(f"\nType 'S' if the original library is in Spotify or " 
                                     + "type 'Y' if the original library is in YouTube Music.\n", 
                                     "green"))
             if source.upper() == "S":
@@ -80,10 +81,6 @@ def main():
                 return get_run_time()
             elif source.upper() == "Y":
                 # TODO: Convert YouTube Music library (liked songs, liked albums, all playlists) to Spotify library
-                input(colored("\nShould we try to add liked videos as well?"
-                            + "Type 'Y' for yes, or 'N' for no." 
-                            + "(Liked songs are always added).\n", 
-                            "green"))
                 yt_converter = YouTubeMusicConverter(YTM_CLIENT, keep_dupes)
                 yt_converter.convert_YT_to_SP_library()
                 return get_run_time()
