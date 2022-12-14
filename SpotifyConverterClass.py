@@ -234,3 +234,4 @@ class SpotifyConverter(Converter):
             sp_playlist = sp_client.next(sp_playlist)
             sp_tracks.extend(sp_playlist["items"])
         return sp_tracks
+
