@@ -2,7 +2,6 @@ import time
 start_time = time.time()
 import spotipy
 import urllib
-import tkinter as tk
 
 from SpotifyConverterClass import SpotifyConverter
 from YouTubeConverterClass import YouTubeMusicConverter
@@ -20,10 +19,9 @@ YTM_CLIENT = YTMusic('headers_auth.json')
 
 # TODO:
 # 1. (?) Add Spotify liked songs to YouTube Music liked songs instead of separate playlist
-# 2. convert YouTube Music library to Spotify library
-# 3. create GUI for easier user input handling
-# 4. refactor SpotifyConverterClass and YouTubeConverterClass into subclasses of a parent ConverterClass
-# 5. improve score function for matching YouTube Music songs with Spotify results
+# 2. create GUI for easier user input handling
+# 3. refactor SpotifyConverterClass and YouTubeConverterClass into subclasses of a parent ConverterClass
+# 4. improve find_best_match() function for matching YouTube Music songs with Spotify results
 
 def main():
     job = input(colored("\nHello! Welcome to the Spotify-Youtube playlist coverter.\n" 
@@ -52,12 +50,10 @@ def main():
                     sp_client = spotipy.Spotify(auth_manager=SpotifyOAuth(scope=sp_scope))
                     sp_converter.convert_SP_to_YT_playlist(sp_client, sp_playlist_ID)
                     sp_converter.print_not_added_songs()
-                    sp_converter.print_not_added_albums()
                     return get_run_time()
                 else:
                     print(colored(f"\nERROR: Make sure the URL directs to a Spotify playlist.\n", "green"))
             elif netloc == "music.youtube.com":
-                # TODO: Convert single YouTube Music playlist to Spotify playlist
                 yt_converter = YouTubeMusicConverter(YTM_CLIENT, keep_dupes)
                 if path == "/playlist":
                     yt_playlist_ID = query[5:]
@@ -65,7 +61,6 @@ def main():
                     sp_client = spotipy.Spotify(auth_manager=SpotifyOAuth(scope=sp_scope))
                     yt_converter.convert_YT_to_SP_playlist(sp_client, yt_playlist_ID)
                     yt_converter.print_not_added_songs()
-                    yt_converter.print_not_added_albums()
                     return get_run_time()
                 else:
                     print(colored(f"\nERROR: Make sure the URL directs to a YouTube Music playlist.\n", "green"))
@@ -80,7 +75,6 @@ def main():
                 sp_converter.convert_SP_to_YT_library()
                 return get_run_time()
             elif source.upper() == "Y":
-                # TODO: Convert YouTube Music library (liked songs, liked albums, all playlists) to Spotify library
                 yt_converter = YouTubeMusicConverter(YTM_CLIENT, keep_dupes)
                 yt_converter.convert_YT_to_SP_library()
                 return get_run_time()
@@ -90,7 +84,7 @@ def main():
 def get_run_time():
     minutes = int((time.time()-start_time)//60)
     seconds = int((time.time()-start_time)%60)
-    print(f"Program run time: {minutes} minutes and {seconds} seconds")
+    print(f"\nProgram run time: {minutes} minutes and {seconds} seconds")
 
 if __name__ == '__main__':
     main()
