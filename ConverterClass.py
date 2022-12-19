@@ -1,13 +1,17 @@
 from termcolor import colored
 
 class Converter():
-    ''' SCORE_COEFFICIENT: constant by which we linearly increment scores when scoring YT search results '''
-    SCORE_COEFFICIENT = 100
+    ''' SCORE: constant by which we linearly increment scores when scoring search results '''
+    SCORE = 100
 
-    ''' EXP_COEFFICIENT: constant by which we exponentially punish differences in song duration when 
-    scoring YT search results (eg. score -= e^(EXP_COEFFICIENT*(abs(DIFFERENCE_IN_SONG_DURATION))))
+    ''' EXP: constant by which we exponentially punish differences in song duration when 
+    scoring search results (eg. score -= e^(EXP_COEFFICIENT*(abs(DIFFERENCE_IN_SONG_DURATION))))
     '''
-    EXP_COEFFICIENT = 0.5
+    EXP = 100
+
+    ''' OFFSET_LIMIT: the number of results at the beginning of search results that receive 
+    additional points (in order to prefer earlier results over later results)'''
+    OFFSET = 2
 
     ''' NOT_ADDED_SONGS: dict where (str) keys = playlist names -> (dict) values = {"unfound":[str], "dupes":[str]}
     - NOT_ADDED_SONGS -> {str:{"unfounded":[str], "dupes":[str]})}
@@ -19,8 +23,9 @@ class Converter():
     ''' NOT_ADDED_ALBUMS: list of album names that were not added because they could not be found'''
     NOT_ADDED_ALBUMS = []
     
-    def __init__(self, YTM_CLIENT, KEEP_DUPES) -> None:
+    def __init__(self, YTM_CLIENT, SP_CLIENT, KEEP_DUPES) -> None:
         self.ytm_client = YTM_CLIENT
+        self.sp_client = SP_CLIENT
         self.keep_dupes = KEEP_DUPES
         pass
 
@@ -44,10 +49,10 @@ class Converter():
             if index == 1:
                 print("None. All songs were fuound.")
             if not self.keep_dupes:
-                print(colored("\nThe following songs were duplicates and were not added:\n", "green"))
+                print(colored("\nThe following songs were duplicates and were not added:", "green"))
                 index = 1
                 for playlist in self.NOT_ADDED_SONGS:
-                    print(f"-----PLAYLIST: {playlist}-----")
+                    print(f"\n-----PLAYLIST: {playlist}-----")
                     for song_query in self.NOT_ADDED_SONGS[playlist]["dupes"]:
                         print(f"{index}. {song_query}")
                         index += 1
@@ -69,6 +74,22 @@ class Converter():
                 print(f"{index + 1}. {album}")
         return
 
+    def print_unfound_song_error(self, playlist_name: str, query: str) -> None: 
+        '''
+        Given a playlist name and song query, adds the query to self.NOT_ADDED, and then
+        prints that the song was not found.\n
+        Parameters:
+        - (str) playlist_name: name of source playlist from which song query was derived
+        - (str) query: query for the song that was not added (eg. f"{song['name']} by {song['artist']}")\n
+        Return:
+        - None
+        '''
+        if playlist_name not in self.NOT_ADDED_SONGS:
+            self.NOT_ADDED_SONGS[playlist_name] = {"unfound":[], "dupes":[]}
+        self.NOT_ADDED_SONGS[playlist_name]["unfound"].append(query)
+        print(colored(f"ERROR: '{query}' not found.", "green"))
+        return
+
     def get_SP_song_info(self, song: dict) -> dict:
         '''
         Given a Spotify song, summarize important song information into a dictionary\n
@@ -78,7 +99,7 @@ class Converter():
         - (dict) dictionary with song name, artist, id, album, and duration
         '''
         song_info = {}
-        song_info["name"] = song["name"].lower()
+        song_info["title"] = song["name"].lower()
         song_info["artist"] = song["artists"][0]["name"].lower()
         song_info["id"] = song["id"]
         song_info["album"] = song["album"]["name"].lower()
@@ -94,7 +115,7 @@ class Converter():
         - (dict) dictionary with song name, artist, id, album, and duration
         '''
         song_info = {}
-        song_info["name"] = song["title"].lower()
+        song_info["title"] = song["title"].lower()
         song_info["artist"] = song["artists"][0]["name"].lower()
         song_info["id"] = song["videoId"]
         if "album" in song and song["album"] != None:
@@ -103,6 +124,8 @@ class Converter():
             song_info["album"] = None
         song_duration_raw = song["duration"]
         song_info["duration_seconds"] = self.get_sec_from_raw_duration(song_duration_raw)
+        song_info["type"] = song["resultType"]
+        song_info["top_result"] = song["category"] == "Top result"
         return song_info
     
     def get_sec_from_raw_duration(self, song_duration_raw: str) -> int:
@@ -115,5 +138,7 @@ class Converter():
         '''
         tokens = song_duration_raw.split(":")
         tokens = [int(i) for i in tokens]
-        song_duration_sec = sum([i*(60**(len(tokens)-tokens.index(i)-1)) for i in tokens])
+        song_duration_sec = 0
+        for index in range(len(tokens)):
+            song_duration_sec += tokens[index] * (60**(len(tokens) - index - 1))
         return song_duration_sec

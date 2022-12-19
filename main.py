@@ -17,11 +17,14 @@ load_dotenv()
 ''' YTM_CLIENT: unofficial YouTube Music API (ytmusicapi library) client '''
 YTM_CLIENT = YTMusic('headers_auth.json')
 
+SP_SCOPE = "playlist-read-private playlist-modify-private user-library-read user-library-modify"
+SP_CLIENT = spotipy.Spotify(auth_manager=SpotifyOAuth(scope=SP_SCOPE))
+
 # TODO:
 # 1. (?) Add Spotify liked songs to YouTube Music liked songs instead of separate playlist
 # 2. create GUI for easier user input handling
-# 3. refactor SpotifyConverterClass and YouTubeConverterClass into subclasses of a parent ConverterClass
-# 4. improve find_best_match() function for matching YouTube Music songs with Spotify results
+# 3. improve find_best_match() algorithm for matching YouTube Music songs with Spotify results
+# 4. (?) if YouTube query cannot be found on Spotify, automatically download YouTube video
 
 def main():
     job = input(colored("\nHello! Welcome to the Spotify-Youtube playlist coverter.\n" 
@@ -43,39 +46,35 @@ def main():
             path = parsed_URL.path
             query = parsed_URL.query
             if netloc == "open.spotify.com":
-                sp_converter = SpotifyConverter(YTM_CLIENT, keep_dupes)
+                sp_converter = SpotifyConverter(YTM_CLIENT, SP_CLIENT, keep_dupes)
                 if path[:10] == "/playlist/":
                     sp_playlist_ID = path[10:]
-                    sp_scope = "playlist-read-private"
-                    sp_client = spotipy.Spotify(auth_manager=SpotifyOAuth(scope=sp_scope))
-                    sp_converter.convert_SP_to_YT_playlist(sp_client, sp_playlist_ID)
+                    sp_converter.convert_SP_to_YT_playlist(sp_playlist_ID)
                     sp_converter.print_not_added_songs()
                     return get_run_time()
                 else:
                     print(colored(f"\nERROR: Make sure the URL directs to a Spotify playlist.\n", "green"))
             elif netloc == "music.youtube.com":
-                yt_converter = YouTubeMusicConverter(YTM_CLIENT, keep_dupes)
+                yt_converter = YouTubeMusicConverter(YTM_CLIENT, SP_CLIENT, keep_dupes)
                 if path == "/playlist":
                     yt_playlist_ID = query[5:]
-                    sp_scope = "playlist-modify-private"
-                    sp_client = spotipy.Spotify(auth_manager=SpotifyOAuth(scope=sp_scope))
-                    yt_converter.convert_YT_to_SP_playlist(sp_client, yt_playlist_ID)
+                    yt_converter.convert_YT_to_SP_playlist(yt_playlist_ID)
                     yt_converter.print_not_added_songs()
                     return get_run_time()
                 else:
                     print(colored(f"\nERROR: Make sure the URL directs to a YouTube Music playlist.\n", "green"))
             else:
-                print(colored(f"\ERROR: Make sure the URL directs to either a Spotify or YouTube Music playlist.\n", "green"))
+                print(colored(f"\nERROR: Make sure the URL directs to either a Spotify or YouTube Music playlist.\n", "green"))
         elif job == "Library":
             source = input(colored(f"\nType 'S' if the original library is in Spotify or " 
                                     + "type 'Y' if the original library is in YouTube Music.\n", 
                                     "green"))
             if source.upper() == "S":
-                sp_converter = SpotifyConverter(YTM_CLIENT, keep_dupes)
+                sp_converter = SpotifyConverter(YTM_CLIENT, SP_CLIENT, keep_dupes)
                 sp_converter.convert_SP_to_YT_library()
                 return get_run_time()
             elif source.upper() == "Y":
-                yt_converter = YouTubeMusicConverter(YTM_CLIENT, keep_dupes)
+                yt_converter = YouTubeMusicConverter(YTM_CLIENT, SP_CLIENT, keep_dupes)
                 yt_converter.convert_YT_to_SP_library()
                 return get_run_time()
             else:
