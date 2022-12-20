@@ -9,10 +9,6 @@ class Converter():
     '''
     EXP = 100
 
-    ''' OFFSET_LIMIT: the number of results at the beginning of search results that receive 
-    additional points (in order to prefer earlier results over later results)'''
-    OFFSET = 2
-
     ''' NOT_ADDED_SONGS: dict where (str) keys = playlist names -> (dict) values = {"unfound":[str], "dupes":[str]}
     - NOT_ADDED_SONGS -> {str:{"unfounded":[str], "dupes":[str]})}
         - "unfound" -> (list) list of song YT queries that were not added because they could not be found
@@ -42,7 +38,7 @@ class Converter():
             print(colored("\nThe following songs could not be found and were not added:\n", "green"))
             index = 1
             for playlist in self.NOT_ADDED_SONGS:
-                print(f"-----PLAYLIST: {playlist}-----")
+                print(f"\n-----PLAYLIST: {playlist}-----")
                 for song_query in self.NOT_ADDED_SONGS[playlist]["unfound"]:
                     print(f"{index}. {song_query}")
                     index += 1

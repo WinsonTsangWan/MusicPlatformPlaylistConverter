@@ -73,7 +73,7 @@ class SpotifyConverter(Converter):
                     self.print_unfound_song_error(sp_playlist_name, yt_query)
             else:
                 self.print_unfound_song_error(sp_playlist_name, f"Song #{count}")
-                print(f"(It was {type(song)} type. Not a song dict).")
+                print(colored(f"(It was {type(song)} type. Not a song dict).", "green"))
             count += 1
         yt_playlist_ID = self.create_YT_playlist(yt_playlist, sp_playlist_name)
         return yt_playlist_ID
@@ -132,24 +132,23 @@ class SpotifyConverter(Converter):
         debug = {}
         best_match_ID = None
         best_score = float("-inf")
+        offset = [2]
         for res in yt_search_res:
             if res["resultType"] == "song" or res["resultType"] == "video":
                 res_info = self.get_YT_song_info(res)
-                res_score = self.score(song_info, res_info)
+                res_score = self.score(song_info, res_info, offset)
                 if res_score > best_score:
                     best_score = res_score
                     best_match_ID = res_info["id"]
-                self.OFFSET = 2
                 print(f"{res_info['title']} by {res_info['artist']}: {res_score}")
-                debug[f"{res_info['title']} by {res_info['artist']}"] = res_score
+                # debug[f"{res_info['title']} by {res_info['artist']}"] = res_score
         if best_score < 0:
-            pprint(debug)
             return None
         return best_match_ID
     
-    def score(self, song_info: dict, res_info: dict) -> int:
+    def score(self, song_info: dict, res_info: dict, offset: list) -> float:
         close_title = song_info["title"] in res_info["title"]
-        close_artist = song_info["artist"] in res_info["title"]
+        close_artist = song_info["artist"] in res_info["artist"]
         same_title = song_info["title"] == res_info["title"]
         same_artist = song_info["artist"] == res_info["artist"]
         same_album = res_info["album"] and res_info["album"] == song_info["album"]
@@ -158,20 +157,24 @@ class SpotifyConverter(Converter):
         major = 0
         if is_top_result:
             major += 2
-        if self.OFFSET:
-            major += self.OFFSET
-            self.OFFSET -= 1
+        if offset[0] > 0:
+            major += offset[0]
+            offset[0] -= 1
         if same_title:
-            major += 1.5
+            major += 2
+        elif close_title:
+            major += 1
         if same_artist:
-            major += 1.5
+            major += 2
+        elif close_artist:
+            major += 1
         if same_album:
-            major += 1.5
+            major += 2
         if is_song:
             if major > 2.5:
                 major += 30
             else:
-                major += 0.5
+                major += 1
         major *= 2
         try:
             diff_factor = math.exp(abs(song_info["duration_seconds"]-res_info["duration_seconds"]))

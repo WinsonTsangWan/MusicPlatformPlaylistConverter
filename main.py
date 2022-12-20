@@ -17,6 +17,7 @@ load_dotenv()
 ''' YTM_CLIENT: unofficial YouTube Music API (ytmusicapi library) client '''
 YTM_CLIENT = YTMusic('headers_auth.json')
 
+''' SP_CLIENT: Spotify API client with scopes SP_SCOPE'''
 SP_SCOPE = "playlist-read-private playlist-modify-private user-library-read user-library-modify"
 SP_CLIENT = spotipy.Spotify(auth_manager=SpotifyOAuth(scope=SP_SCOPE))
 
@@ -24,6 +25,10 @@ SP_CLIENT = spotipy.Spotify(auth_manager=SpotifyOAuth(scope=SP_SCOPE))
 # 1. (?) Add Spotify liked songs to YouTube Music liked songs instead of separate playlist
 # 2. create GUI for easier user input handling
 # 3. improve find_best_match() algorithm for matching YouTube Music songs with Spotify results
+#    - Note: Sometimes, we choose incorrect song results over the correct music video result if 
+#            the music video duration is very different from the song audio duration (which is
+#            what is seen on Spotify). In these cases, how do we choose the long music video 
+#            result over the incorrect results?  
 # 4. (?) if YouTube query cannot be found on Spotify, automatically download YouTube video
 
 def main():
