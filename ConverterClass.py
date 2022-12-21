@@ -50,34 +50,38 @@ class Converter():
         Return:
         - None
         '''
-        if self.NOT_ADDED_SONGS["unfound"]:
+        if self.NOT_ADDED_SONGS:
             print(colored("\nThe following songs could not be found and were not added:", "green"))
             index = 1
             for playlist in self.NOT_ADDED_SONGS:
-                print(f"\n-----PLAYLIST: {playlist}-----")
+                print(colored(f"\n-----PLAYLIST: {playlist}-----", "green"))
                 for song_query in self.NOT_ADDED_SONGS[playlist]["unfound"]:
-                    print(f"{index}. {song_query}")
+                    print(colored(f"{index}. {song_query}", "green"))
                     index += 1
             if index == 1:
-                print("None. All songs were fuound.")
-        if not self.keep_dupes and self.NOT_ADDED_SONGS["dupes"]:
-            print(colored("\nThe following songs were duplicates and were not added:", "green"))
-            index = 1
-            for playlist in self.NOT_ADDED_SONGS:
-                print(f"\n-----PLAYLIST: {playlist}-----")
-                for song_query in self.NOT_ADDED_SONGS[playlist]["dupes"]:
-                    print(f"{index}. {song_query}")
-                    index += 1
-            if index == 1:
-                print("None. Source playlist had no duplicates.")
-        if not self.download_videos and self.NOT_ADDED_SONGS["downloaded"]:
-            print(colored("\nThe following songs were not song type objects and were not added nor downloaded:", "green"))
-            index = 1
-            for playlist in self.NOT_ADDED_SONGS:
-                print(f"\n-----PLAYLIST: {playlist}-----")
-                for song_query in self.NOT_ADDED_SONGS[playlist]["dupes"]:
-                    print(f"{index}. {song_query}")
-                    index += 1
+                print(colored("None. All songs were found.", "green"))
+            if not self.keep_dupes:
+                print(colored("\nThe following songs were duplicates and were not added:", "green"))
+                index = 1
+                for playlist in self.NOT_ADDED_SONGS:
+                    print(colored(f"\n-----PLAYLIST: {playlist}-----", "green"))
+                    for song_query in self.NOT_ADDED_SONGS[playlist]["dupes"]:
+                        print(colored(f"{index}. {song_query}", "green"))
+                        index += 1
+                if index == 1:
+                    print(colored("None. Source playlist had no duplicates.", "green"))
+            if not self.download_videos:
+                print(colored("\nThe following songs were not song type objects and were not " 
+                    + "added nor downloaded:", "green"))
+                index = 1
+                for playlist in self.NOT_ADDED_SONGS:
+                    print(colored(f"\n-----PLAYLIST: {playlist}-----", "green"))
+                    for song_query in self.NOT_ADDED_SONGS[playlist]["downloaded"]:
+                        print(colored(f"{index}. {song_query}", "green"))
+                        index += 1
+                if index == 1:
+                    print(colored("None. All songs from source playlist were either added, " 
+                        + "downloaded, or not added for other reasons.", "green"))
         return
 
     def print_not_added_albums(self) -> None:
@@ -91,23 +95,31 @@ class Converter():
         if self.NOT_ADDED_ALBUMS:
             print("\nThe following albums could not be found and were not added:")
             for index, album in enumerate(self.NOT_ADDED_ALBUMS):
-                print(f"{index + 1}. {album}")
+                print(colored(f"{index + 1}. {album}", "green"))
         return
 
-    def print_unfound_song_error(self, playlist_name: str, query: str) -> None: 
+    def print_unadded_song_error(self, playlist_name: str, query: str, reason: str) -> None: 
         '''
         Given a playlist name and song query, adds the query to self.NOT_ADDED, and then
         prints that the song was not found.\n
         Parameters:
         - (str) playlist_name: name of source playlist from which song query was derived
-        - (str) query: query for the song that was not added (eg. f"{song['name']} by {song['artist']}")\n
+        - (str) query: query for the song that was not added (eg. f"{song['name']} by {song['artist']}")
+        - (str) reason: reason for the song not being added (ie. which NOT_ADDED_SONGS bucket to put the song)
+            - "unfound": if the song could not be found with the query
+            - "dupes": if the song is a duplicate (we handle duplicates when creating the playlist)
+            - "downloads": if the song is a YouTube Music video that is neither a song type nor an official music
+                video type, and thus must be either downloaded or discarded
         Return:
         - None
         '''
         if playlist_name not in self.NOT_ADDED_SONGS:
-            self.NOT_ADDED_SONGS[playlist_name] = {"unfound":[], "dupes":[]}
-        self.NOT_ADDED_SONGS[playlist_name]["unfound"].append(query)
-        print(colored(f"ERROR: '{query}' not found.", "green"))
+            self.NOT_ADDED_SONGS[playlist_name] = {"unfound":[], "dupes":[], "downloaded":[]}
+        self.NOT_ADDED_SONGS[playlist_name][reason].append(query)
+        if reason == "unfound":
+            print(colored(f"ERROR: \"{query}\" not found.", "green"))
+        elif reason == "downloaded":
+            print(colored(f"{query} not added because it was a video type object, not a song type object.", "green"))
         return
 
     def get_SP_song_info(self, song: dict) -> dict:

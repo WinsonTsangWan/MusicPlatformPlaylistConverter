@@ -55,7 +55,7 @@ class SpotifyConverter(Converter):
             song = sp_track["track"]
             if song:
                 song_info = self.get_SP_song_info(song)
-                yt_query = f"'{song['name']}' by {song['artists'][0]['name']}"
+                yt_query = f"{song['name']} by {song['artists'][0]['name']}"
                 yt_search_res = self.ytm_client.search(query=yt_query)
                 best_match_ID = self.find_best_match(yt_search_res, song_info)
                 if best_match_ID:

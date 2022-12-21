@@ -22,6 +22,9 @@ class YouTubeMusicConverter(Converter):
             yt_playlist_ID = yt_playlist["playlistId"]
             self.convert_YT_to_SP_playlist(yt_playlist_ID)
 
+        # Download YouTube Music videos that are not song types or official music videos
+        self.download_YT_videos()
+
         # Convert YouTube Music Liked Albums to Spotify Liked Albums
         self.convert_YT_liked_albums()
 
@@ -51,37 +54,31 @@ class YouTubeMusicConverter(Converter):
             yt_playlist = self.ytm_client.get_playlist(yt_playlist_ID, limit=None)
         print(colored(f"\nYouTube Music playlist detected: '{yt_playlist_name}'", "green"))
         yt_tracks = yt_playlist["tracks"]
-        yt_download_IDs = []
         sp_playlist = {}
         count = 1
         print(colored("Copying contents into Spotify playlist...", "green"))
         for yt_song in yt_tracks:
             if yt_song:
                 song_info = self.get_YT_song_info(yt_song)
-                sp_query = f"'{song_info['title']}' by {song_info['artist']}"
+                sp_query = f"{song_info['title']} {song_info['artist']}"
                 if (yt_song["videoType"] == "MUSIC_VIDEO_TYPE_ATV" or 
                     yt_song["videoType"] == "MUSIC_VIDEO_TYPE_OMV"):
-                    best_match_ID = self.do_two_queries(song_info)
+                    best_match_ID = self.do_multiple_queries(song_info)
                     if best_match_ID:
                         if best_match_ID not in sp_playlist:
                             sp_playlist[best_match_ID] = {"full_sp_query": sp_query, "count":1}
                         else:
                             sp_playlist[best_match_ID]["count"] += 1
-                        print(colored(f"Copying song {count}/{len(yt_tracks)}", "green"))
                     else:
-                        self.print_unfound_song_error(yt_playlist_name, sp_query)
-                elif self.download_videos:
-                    yt_download_IDs.append(yt_song["videoId"])
-                    print(colored(f"Copying song {count}/{len(yt_tracks)}", "green"))
+                        self.print_unadded_song_error(yt_playlist_name, sp_query, "unfound")
                 else:
-                    print(colored(f"{sp_query} not added because it was a video type object, " 
-                        + "not a song type object.", "green"))
+                    self.print_unadded_song_error(yt_playlist_name, sp_query, "downloaded")
+                print(colored(f"Copying song {count}/{len(yt_tracks)}", "green"))
             else:
-                self.print_unfound_song_error(yt_playlist_name, f"Song #{count}")
+                self.print_unadded_song_error(yt_playlist_name, f"Song #{count}", "unfound")
                 print(colored(f"(It was {type(yt_song)} type. Not a song dict).", "green"))
             count += 1
         sp_playlist_ID = self.create_SP_playlist(yt_playlist_name, sp_playlist)
-        self.download_YT_videos(yt_playlist_name, yt_download_IDs)
         return sp_playlist_ID
 
     def convert_YT_liked_albums(self) -> None:
@@ -122,7 +119,7 @@ class YouTubeMusicConverter(Converter):
                     self.NOT_ADDED_ALBUMS.append(sp_query)
         return
 
-    def do_two_queries(self, song_info: dict):
+    def do_multiple_queries(self, song_info: dict):
         '''
         Given a song name and artist, perform two Spotify queries - one with just the song name and one
         with both the song name and the artist - and run find_best_match on both search results, and 
@@ -132,17 +129,22 @@ class YouTubeMusicConverter(Converter):
         Return:
         - (str) Spotify song ID of search result with best holistic score (ie. best match to the song in song_info)
         '''
-        query_1 = song_info["title"]
-        query_2 = song_info["title"] + " " + song_info["artist"]
-        search_res_1 = self.sp_client.search(query_1, type="track", limit=50)["tracks"]["items"]
-        search_res_2 = self.sp_client.search(query_2, type="track", limit=50)["tracks"]["items"]
-        best_match_1, score_1 = self.find_best_match(search_res_1, song_info)
-        best_match_2, score_2 = self.find_best_match(search_res_2, song_info)
-        if score_1 >= score_2:
-            return best_match_1
-        return best_match_2
+        url_encode_title = '%20'.join(song_info['title'].split())
+        url_encode_artist = '%20'.join(song_info['artist'].split())
+        query_1 = f"track:{url_encode_title}%20artist:{url_encode_artist}"
+        query_2 = f"{song_info['title']}"
+        query_3 = f"{song_info['title']} {song_info['artist']}"
+        queries_lst = [query_1, query_2, query_3]
+        local_best_scores_dict = {}
+        for query in queries_lst:
+            # print(f"\nQUERY: {query}")
+            search_res = self.sp_client.search(query, type="track", limit=50)["tracks"]["items"]
+            local_best_match_ID, local_best_score = self.find_best_match_complex(search_res, song_info)
+            local_best_scores_dict[local_best_match_ID] = local_best_score
+        overall_best_match_ID = max(local_best_scores_dict, key=local_best_scores_dict.get)
+        return overall_best_match_ID
 
-    def find_best_match(self, sp_search_res: list, song_info: dict) -> str:
+    def find_best_match_complex(self, sp_search_res: list, song_info: dict) -> str:
         '''
         Given a list of Spotify search results and a target song to match, holistically score each 
         search result and then return the result with the highest score (ie. the best match).\n
@@ -169,8 +171,10 @@ class YouTubeMusicConverter(Converter):
 
     def score(self, song_info: dict, res_info: dict, offset: list) -> float:
         major = 0
-        close_title = song_info["title"] in res_info["title"]
-        close_artist = song_info["artist"] in res_info["artist"]
+        close_title = (song_info["title"] in res_info["title"] or 
+                        res_info["title"] in song_info["title"])
+        close_artist = (song_info["artist"] in res_info["artist"] or 
+                        res_info["artist"] in song_info["artist"])
         same_title = song_info["title"] == res_info["title"]
         same_artist = song_info["artist"] == res_info["artist"]
         same_album = res_info["album"] and res_info["album"] == song_info["album"]
@@ -256,7 +260,7 @@ class YouTubeMusicConverter(Converter):
                     + "Check your Spotify library to find it.", "green"))
         return sp_playlist_ID
 
-    def download_YT_videos(self, yt_playlist_name: str, yt_download_IDs: list) -> None:
+    def download_YT_videos(self) -> None:
         '''
         Given a list of video IDs of YouTube videos, download all videos using youtube_dl.\n
         Parameters:
@@ -283,16 +287,18 @@ class YouTubeMusicConverter(Converter):
             - None
             '''
             if d["status"] == "finished":
-                print(colored(f"Finished downloading song {count}/{len(yt_download_IDs)}", "green"))
+                print(colored(f"\nFinished downloading song {count}/{len(yt_download_IDs)}", "green"))
             return
-        count = 1
-        self.YTDL_OPTIONS['outtmpl'] = f"/{yt_playlist_name}/%(title)s.%(ext)s"
-        self.YTDL_OPTIONS['progress_hooks'] = [print_YT_download_progress]
         if self.download_videos:
-            print(colored(f"Downloading {len(yt_download_IDs)} videos that are not song type objects...", "green"))
-            for video_ID in yt_download_IDs:
-                yt_video_URL = "https://www.youtube.com/watch?v="+video_ID
-                with youtube_dl.YoutubeDL(self.YTDL_OPTIONS) as ytdl:
-                    ytdl.download([yt_video_URL])
-                count += 1
+            for playlist in self.NOT_ADDED_SONGS:
+                count = 1
+                self.YTDL_OPTIONS['outtmpl'] = f"/{playlist}/%(title)s.%(ext)s"
+                self.YTDL_OPTIONS['progress_hooks'] = [print_YT_download_progress]
+                yt_download_IDs = self.NOT_ADDED_SONGS[playlist]
+                print(colored(f"\nDownloading {len(yt_download_IDs)} videos that are not song type objects...", "green"))
+                for video_ID in yt_download_IDs:
+                    yt_video_URL = "https://www.youtube.com/watch?v="+video_ID
+                    with youtube_dl.YoutubeDL(self.YTDL_OPTIONS) as ytdl:
+                        ytdl.download([yt_video_URL])
+                    count += 1
         return

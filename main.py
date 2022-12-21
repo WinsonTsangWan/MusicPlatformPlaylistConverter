@@ -28,7 +28,12 @@ SP_CLIENT = spotipy.Spotify(auth_manager=SpotifyOAuth(scope=SP_SCOPE))
 #    - Note: Sometimes, we choose incorrect YouTube song results over the correct music video 
 #            result if the music video duration is very different from the song audio duration 
 #            (as seen on Spotify). In these cases, how do we choose the long music video result 
-#            over the incorrect results?  
+#            over the incorrect results?
+#    - Solution: add all results with major > some threshold to a list and discard the rest, then
+#                exponentially punish differences in song duration among these, rather then 
+#                exponentially punish differences in song duration on all results (this should 
+#                favor long music videos over results with similar duration but are completely incorrect)
+#    - Solution: for video results, search only the video title
 # 4. (?) if YouTube query cannot be found on Spotify, automatically download YouTube video
 
 def main():
@@ -60,15 +65,16 @@ def main():
                 else:
                     print(colored(f"\nERROR: Make sure the URL directs to a Spotify playlist.\n", "green"))
             elif netloc == "music.youtube.com":
-                download = input(colored(f"\nShould we download the mp3 for YouTube Music videos and songs " 
-                            + "that we can't find on Spotify? Type 'Y' for yes, or 'N' for no.\n", "green"))
-                while download.upper() != 'Y' and download.upper() != 'N':
-                    download = input(colored("\nMake sure you're entering either 'Y' or 'N'.\n", "green"))
-                download = True if download.upper() == 'Y' else False
-                yt_converter = YouTubeMusicConverter(YTM_CLIENT, SP_CLIENT, keep_dupes, download)
                 if path == "/playlist":
+                    download = input(colored(f"\nShould we download the mp3 for YouTube Music videos and songs " 
+                            + "that we can't find on Spotify? Type 'Y' for yes, or 'N' for no.\n", "green"))
+                    while download.upper() != 'Y' and download.upper() != 'N':
+                        download = input(colored("\nMake sure you're entering either 'Y' or 'N'.\n", "green"))
+                    download = True if download.upper() == 'Y' else False
+                    yt_converter = YouTubeMusicConverter(YTM_CLIENT, SP_CLIENT, keep_dupes, download)
                     yt_playlist_ID = query[5:]
                     yt_converter.convert_YT_to_SP_playlist(yt_playlist_ID)
+                    yt_converter.download_YT_videos()
                     yt_converter.print_not_added_songs()
                     return get_run_time()
                 else:
