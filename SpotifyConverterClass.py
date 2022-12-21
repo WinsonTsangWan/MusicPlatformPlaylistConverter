@@ -65,10 +65,9 @@ class SpotifyConverter(Converter):
                         yt_playlist[best_match_ID]["count"] += 1
                     print(colored(f"Copying song {count}/{len(sp_tracks)}", "green"))
                 else:
-                    self.print_unfound_song_error(sp_playlist_name, yt_query)
+                    self.print_unadded_song_error(sp_playlist_name, yt_query, "unfound")
             else:
-                self.print_unfound_song_error(sp_playlist_name, f"Song #{count}")
-                print(colored(f"(It was {type(song)} type. Not a song dict).", "green"))
+                self.print_unadded_song_error(sp_playlist_name, f"Song #{count}", "unfound")
             count += 1
         yt_playlist_ID = self.create_YT_playlist(yt_playlist, sp_playlist_name)
         return yt_playlist_ID
@@ -163,8 +162,10 @@ class SpotifyConverter(Converter):
             major += 1
         if same_album:
             major += 2
+        if major <= 1:
+            return float("-inf")
         if is_song:
-            if major > 2.5:
+            if major >= 3:
                 major += 30
             else:
                 major += 1
