@@ -1,15 +1,10 @@
 import math
-import spotipy
 
 from pprint import pprint
 from ConverterClass import Converter
 from termcolor import colored
-from spotipy.oauth2 import SpotifyOAuth
 
 class SpotifyConverter(Converter):
-
-    ''' CUTOFF_COEFFICIENT: when scoring search results, if the current song's score is greater than this
-    coefficient, then we stop iterating and simply take the current song as the best match'''
 
     def convert_SP_to_YT_library(self) -> None:
         '''
@@ -60,7 +55,7 @@ class SpotifyConverter(Converter):
             song = sp_track["track"]
             if song:
                 song_info = self.get_SP_song_info(song)
-                yt_query = f"{song['name']} by {song['artists'][0]['name']}"
+                yt_query = f"'{song['name']}' by {song['artists'][0]['name']}"
                 yt_search_res = self.ytm_client.search(query=yt_query)
                 best_match_ID = self.find_best_match(yt_search_res, song_info)
                 if best_match_ID:
@@ -129,10 +124,9 @@ class SpotifyConverter(Converter):
         Return:
         - (str) video ID of search result with best holistic score (ie. best match to the song in song_info)
         '''
-        debug = {}
         best_match_ID = None
         best_score = float("-inf")
-        offset = [2]
+        offset = [self.OFFSET]
         for res in yt_search_res:
             if res["resultType"] == "song" or res["resultType"] == "video":
                 res_info = self.get_YT_song_info(res)
@@ -140,8 +134,7 @@ class SpotifyConverter(Converter):
                 if res_score > best_score:
                     best_score = res_score
                     best_match_ID = res_info["id"]
-                print(f"{res_info['title']} by {res_info['artist']}: {res_score}")
-                # debug[f"{res_info['title']} by {res_info['artist']}"] = res_score
+                # print(f"{res_info['title']} by {res_info['artist']}: {res_score}")
         if best_score < 0:
             return None
         return best_match_ID
@@ -227,7 +220,7 @@ class SpotifyConverter(Converter):
             - "LIKED_ALBUMS" for liked albums\n
         Return:
         - (list[dict]) list of all songs (dicts) on a Spotify playlist\n
-        Note: Spotify playlists are paginated, meaning sp_playlist["items"] only retrieves the
+        NOTE: Spotify playlists are paginated, meaning sp_playlist["items"] only retrieves the
         first 100 items. If there are more than 100 items on the playlist, then we must 
         request the next page using self.sp_client.next(sp_playlist). Here, we simply do that
         for every page, add all items from each page to a list, and return that list.

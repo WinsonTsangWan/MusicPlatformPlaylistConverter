@@ -24,18 +24,18 @@ SP_CLIENT = spotipy.Spotify(auth_manager=SpotifyOAuth(scope=SP_SCOPE))
 # TODO:
 # 1. (?) Add Spotify liked songs to YouTube Music liked songs instead of separate playlist
 # 2. create GUI for easier user input handling
-# 3. improve find_best_match() algorithm for matching YouTube Music songs with Spotify results
-#    - Note: Sometimes, we choose incorrect song results over the correct music video result if 
-#            the music video duration is very different from the song audio duration (which is
-#            what is seen on Spotify). In these cases, how do we choose the long music video 
-#            result over the incorrect results?  
+# 3. improve find_best_match() algorithm for matching search results with search query:
+#    - Note: Sometimes, we choose incorrect YouTube song results over the correct music video 
+#            result if the music video duration is very different from the song audio duration 
+#            (as seen on Spotify). In these cases, how do we choose the long music video result 
+#            over the incorrect results?  
 # 4. (?) if YouTube query cannot be found on Spotify, automatically download YouTube video
 
 def main():
     job = input(colored("\nHello! Welcome to the Spotify-Youtube playlist coverter.\n" 
             + "Type 'L' to convert a library, or type 'P' to convert a playlist.\n", "green"))
     while job.upper() != "L" and job.upper() != "P":
-        job = input(colored("\nMake sure you're entering either 'L' or 'P'.", "green"))
+        job = input(colored("\nMake sure you're entering either 'L' or 'P'.\n", "green"))
 
     keep_dupes = input(colored("\nShould we keep duplicates? Type 'Y' for yes, or 'N' for no.\n", "green"))
     while keep_dupes.upper() != "Y" and keep_dupes.upper() != "N":
@@ -60,7 +60,12 @@ def main():
                 else:
                     print(colored(f"\nERROR: Make sure the URL directs to a Spotify playlist.\n", "green"))
             elif netloc == "music.youtube.com":
-                yt_converter = YouTubeMusicConverter(YTM_CLIENT, SP_CLIENT, keep_dupes)
+                download = input(colored(f"\nShould we download the mp3 for YouTube Music videos and songs " 
+                            + "that we can't find on Spotify? Type 'Y' for yes, or 'N' for no.\n", "green"))
+                while download.upper() != 'Y' and download.upper() != 'N':
+                    download = input(colored("\nMake sure you're entering either 'Y' or 'N'.\n", "green"))
+                download = True if download.upper() == 'Y' else False
+                yt_converter = YouTubeMusicConverter(YTM_CLIENT, SP_CLIENT, keep_dupes, download)
                 if path == "/playlist":
                     yt_playlist_ID = query[5:]
                     yt_converter.convert_YT_to_SP_playlist(yt_playlist_ID)
@@ -79,7 +84,12 @@ def main():
                 sp_converter.convert_SP_to_YT_library()
                 return get_run_time()
             elif source.upper() == "Y":
-                yt_converter = YouTubeMusicConverter(YTM_CLIENT, SP_CLIENT, keep_dupes)
+                download = input(colored(f"\nShould we download the mp3 for YouTube Music videos and songs " 
+                        + "that we can't find on Spotify? Type 'Y' for yes, or 'N' for no.\n", "green"))
+                while download.upper() != 'Y' and download.upper() != 'N':
+                    download = input(colored("\nMake sure you're entering either 'Y' or 'N'.\n", "green"))
+                download = True if download.upper() == 'Y' else False
+                yt_converter = YouTubeMusicConverter(YTM_CLIENT, SP_CLIENT, keep_dupes, download)
                 yt_converter.convert_YT_to_SP_library()
                 return get_run_time()
             else:
