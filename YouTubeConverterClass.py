@@ -54,7 +54,7 @@ class YouTubeMusicConverter(Converter):
             yt_playlist = self.ytm_client.get_playlist(yt_playlist_ID, limit=None)
         print(colored(f"\nYouTube Music playlist detected: '{yt_playlist_name}'", "green"))
         yt_tracks = yt_playlist["tracks"]
-        sp_playlist = {}
+        sp_playlist = []
         count = 1
         print(colored("Copying contents into Spotify playlist...", "green"))
         for yt_song in yt_tracks:
@@ -66,22 +66,22 @@ class YouTubeMusicConverter(Converter):
                     best_match_ID = self.do_multiple_queries(song_info)
                     if best_match_ID:
                         if best_match_ID not in sp_playlist:
-                            sp_playlist[best_match_ID] = {"full_sp_query": sp_query, "count":1}
+                            sp_playlist.append(best_match_ID)
                         else:
-                            sp_playlist[best_match_ID]["count"] += 1
+                            self.print_unadded_song_error(yt_playlist, "dupes", sp_query, best_match_ID)
                     else:
-                        self.print_unadded_song_error(yt_playlist_name, sp_query, "unfound")
+                        self.print_unadded_song_error(yt_playlist_name, "unfound", sp_query)
                 else:
-                    self.print_unadded_song_error(yt_playlist_name, sp_query, "downloaded")
+                    self.print_unadded_song_error(yt_playlist_name, "downloads", sp_query, song_info["id"])
                 print(colored(f"Copying song {count}/{len(yt_tracks)}", "green"))
             else:
-                self.print_unadded_song_error(yt_playlist_name, f"Song #{count}", "unfound")
-                print(colored(f"(It was {type(yt_song)} type. Not a song dict).", "green"))
+                self.print_unadded_song_error(yt_playlist_name, "unfound", f"Song #{count}")
+                print(colored(f"(It was {type(yt_song)} type, not a song dict. Couldn't even query.)", "green"))
             count += 1
         sp_playlist_ID = self.create_SP_playlist(yt_playlist_name, sp_playlist)
         return sp_playlist_ID
 
-    def convert_YT_liked_albums(self) -> None:
+    def convert_YT_to_SP_liked_albums(self) -> None:
         '''
         Given a list of YouTube Music Liked Albums, add all albums to Spotify Liked Albums, 
         and returns a list of albums that were not added.\n
@@ -121,9 +121,8 @@ class YouTubeMusicConverter(Converter):
 
     def do_multiple_queries(self, song_info: dict):
         '''
-        Given a song name and artist, perform two Spotify queries - one with just the song name and one
-        with both the song name and the artist - and run find_best_match on both search results, and 
-        then choose the better of the two search results.\n
+        Given a song name and artist, perform multiple Spotify queries and run find_best_match on 
+        both search results, and then choose the better of the two search results.\n
         Parameters:
         - (dict) song_info: dictionary with song name, artist, album and duration of the target song\n
         Return:
@@ -234,27 +233,19 @@ class YouTubeMusicConverter(Converter):
                         description="Includes duplicates" if self.keep_dupes else "Does not include duplicates")["id"]
 
         # ADD LIST OF SONGS TO SPOTIFY PLAYLIST
-        add_songs = list(sp_playlist.keys())
-        if add_songs:
-            while len(add_songs) > 100:
-                self.sp_client.user_playlist_add_tracks(user_ID, sp_playlist_ID, add_songs[:100])
-                add_songs = add_songs[100:]
-            self.sp_client.user_playlist_add_tracks(user_ID, sp_playlist_ID, add_songs)
+        if sp_playlist:
+            while len(sp_playlist) > 100:
+                self.sp_client.user_playlist_add_tracks(user_ID, sp_playlist_ID, sp_playlist[:100])
+                sp_playlist = sp_playlist[100:]
+            self.sp_client.user_playlist_add_tracks(user_ID, sp_playlist_ID, sp_playlist)
 
         # HANDLE DUPLICATES
-        dupes = []
-        for song_ID in sp_playlist:
-            count = sp_playlist[song_ID]["count"]
-            if count > 1:
-                for _ in range(count-1):
-                    dupes.append(song_ID)
-                    if not self.keep_dupes:
-                        self.NOT_ADDED_SONGS[yt_playlist_name]["dupes"].append(sp_playlist[song_ID]['sp_query'])
-        if self.keep_dupes and dupes:
-            while len(add_songs) > 100:
-                self.sp_client.user_playlist_add_tracks(user_ID, sp_playlist_ID, dupes[:100])
-                dupes = dupes[100:]
-            self.sp_client.user_playlist_add_tracks(user_ID, sp_playlist_ID, dupes)
+        for playlist in self.NOT_ADDED_SONGS:
+            dupes = self.NOT_ADDED_SONGS[playlist]["dupes"]
+            if self.keep_dupes and dupes:
+                while len(dupes) > 100:
+                    self.sp_client.user_playlist_add_tracks(user_ID, sp_playlist_ID, dupes[:100])
+                    dupes = dupes[100:]
 
         print(colored("Finished! Spotify playlist has been created.\n" 
                     + "Check your Spotify library to find it.", "green"))
@@ -294,7 +285,7 @@ class YouTubeMusicConverter(Converter):
                 count = 1
                 self.YTDL_OPTIONS['outtmpl'] = f"/{playlist}/%(title)s.%(ext)s"
                 self.YTDL_OPTIONS['progress_hooks'] = [print_YT_download_progress]
-                yt_download_IDs = self.NOT_ADDED_SONGS[playlist]
+                yt_download_IDs = self.NOT_ADDED_SONGS[playlist]["downloads"]
                 print(colored(f"\nDownloading {len(yt_download_IDs)} videos that are not song type objects...", "green"))
                 for video_ID in yt_download_IDs:
                     yt_video_URL = "https://www.youtube.com/watch?v="+video_ID

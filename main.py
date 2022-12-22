@@ -24,7 +24,7 @@ SP_CLIENT = spotipy.Spotify(auth_manager=SpotifyOAuth(scope=SP_SCOPE))
 # TODO:
 # 1. (?) Add Spotify liked songs to YouTube Music liked songs instead of separate playlist
 # 2. create GUI for easier user input handling
-# 3. improve find_best_match() algorithm for matching search results with search query:
+# 3. [MOSTLY DONE] improve find_best_match() algorithm for matching search results with query:
 #    - Note: Sometimes, we choose incorrect YouTube song results over the correct music video 
 #            result if the music video duration is very different from the song audio duration 
 #            (as seen on Spotify). In these cases, how do we choose the long music video result 
@@ -34,7 +34,7 @@ SP_CLIENT = spotipy.Spotify(auth_manager=SpotifyOAuth(scope=SP_SCOPE))
 #                exponentially punish differences in song duration on all results (this should 
 #                favor long music videos over results with similar duration but are completely incorrect)
 #    - Solution: for video results, search only the video title
-# 4. (?) if YouTube query cannot be found on Spotify, automatically download YouTube video
+# 4. [DONE] if YouTube query cannot be found on Spotify, automatically download YouTube video
 
 def main():
     job = input(colored("\nHello! Welcome to the Spotify-Youtube playlist coverter.\n" 

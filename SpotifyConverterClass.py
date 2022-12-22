@@ -162,6 +162,7 @@ class SpotifyConverter(Converter):
             major += 1
         if same_album:
             major += 2
+        # Ignore results with major <= 1 (to be conservative with matches)
         if major <= 1:
             return float("-inf")
         if is_song:
