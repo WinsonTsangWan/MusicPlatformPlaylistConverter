@@ -101,10 +101,11 @@ def main():
             else:
                 print(colored("\nMake sure you're entering either 'S' or 'Y'.\n", "green"))
 
-def get_run_time():
+def get_run_time() -> None:
     minutes = int((time.time()-start_time)//60)
     seconds = int((time.time()-start_time)%60)
     print(f"\nProgram run time: {minutes} minutes and {seconds} seconds")
+    return
 
 if __name__ == '__main__':
     main()

@@ -56,40 +56,28 @@ class Converter():
         - None
         '''
         if self.NOT_ADDED_SONGS:
-            print(colored("\nThe following songs could not be found and were not added:", "green"))
-            index = 1
             for playlist in self.NOT_ADDED_SONGS:
-                print(colored(f"\n-----PLAYLIST: {playlist}-----", "green"))
-                for song_query in self.NOT_ADDED_SONGS[playlist]["unfound"]:
-                    print(colored(f"{index}. {song_query}", "green"))
-                    index += 1
-            if index == 1:
-                print(colored("None. All songs were found.", "green"))
-            if not self.keep_dupes:
-                print(colored("\nThe following songs were duplicates and were not added:", "green"))
-                index = 1
-                for playlist in self.NOT_ADDED_SONGS:
-                    print(colored(f"\n-----PLAYLIST: {playlist}-----", "green"))
-                    for song_query in self.NOT_ADDED_SONGS[playlist]["dupes"]:
-                        print(colored(f"{index}. {song_query}", "green"))
-                        index += 1
-                if index == 1:
-                    print(colored("None. Source playlist had no duplicates.", "green"))
-            if not self.download_videos:
-                print(colored("\nThe following songs were not song type objects and were not " 
-                    + "added nor downloaded:", "green"))
-                index = 1
-                for playlist in self.NOT_ADDED_SONGS:
-                    print(colored(f"\n-----PLAYLIST: {playlist}-----", "green"))
-                    for song_query in self.NOT_ADDED_SONGS[playlist]["downloads"]:
-                        print(colored(f"{index}. {song_query}", "green"))
-                        index += 1
-                if index == 1:
-                    print(colored("None. All songs from source playlist were either added, " 
-                        + "downloaded, or not added for other reasons.", "green"))
+                unfound = self.NOT_ADDED_SONGS[playlist]["unfound"]
+                dupes = self.NOT_ADDED_SONGS[playlist]["dupes"]
+                downloads = self.NOT_ADDED_SONGS[playlist]["downloads"]
+                print_unfound = unfound
+                print_dupes = dupes and not self.keep_dupes
+                print_downloads = downloads and not self.download_videos
+                if print_unfound or print_dupes or print_downloads:
+                    self.print("\n_______________PLAYLIST: {playlist}_______________")
+                    if print_unfound:
+                        self.print("\nThe following songs could not be found and were not added:")
+                        for index, song_query in enumerate(unfound):
+                            self.print(f"{index + 1}. {song_query}")
+                    if print_dupes:
+                        self.print("\nThe following songs were duplicates and were not added:")
+                        for index, song_query in enumerate(dupes):
+                            self.print(f"{index + 1}. {song_query}")
+                    if print_downloads:
+                        self.print("\nThe following songs were not song type objects and were not added nor downloaded:")
+                        for index, song_query in enumerate(downloads):
+                            self.print(f"{index + 1}. {song_query}")
         return
-
-    
 
     def print_not_added_albums(self) -> None:
         '''
@@ -100,9 +88,9 @@ class Converter():
         - None
         '''
         if self.NOT_ADDED_ALBUMS:
-            print("\nThe following albums could not be found and were not added:")
+            self.print("\nThe following albums could not be found and were not added:")
             for index, album in enumerate(self.NOT_ADDED_ALBUMS):
-                print(colored(f"{index + 1}. {album}", "green"))
+                self.print(f"{index + 1}. {album}")
         return
 
     def print_unadded_song_error(self, playlist_name: str, reason: str, query: str, ID: str = None) -> None: 
@@ -125,13 +113,19 @@ class Converter():
             self.NOT_ADDED_SONGS[playlist_name] = {"unfound":[], "dupes":[], "downloads":[]}
         if reason == "unfound":
             self.NOT_ADDED_SONGS[playlist_name]["unfound"].append(query)
-            print(colored(f"ERROR: \"{query}\" not found.", "green"))
+            self.print(f"ERROR: \"{query}\" not found.")
         elif reason == "dupes":
-            self.NOT_ADDED_SONGS[playlist_name]["unfound"].append(ID)
-            print(colored(f"\"{query}\" not added because it was a duplicate.", "green"))
+            if ID:
+                self.NOT_ADDED_SONGS[playlist_name]["unfound"].append(ID)
+                self.print(f"\"{query}\" not added because it was a duplicate.")
+            else:
+                self.print(f"ERROR: No ID provided for duplicate query: \"{query}\"")
         elif reason == "downloads":
-            self.NOT_ADDED_SONGS[playlist_name]["downloads"].append(ID)
-            print(colored(f"\"{query}\" not added because it was a video type object, not a song type object.", "green"))
+            if ID:
+                self.NOT_ADDED_SONGS[playlist_name]["downloads"].append(ID)
+                self.print(f"\"{query}\" not added because it was a video type object, not a song type object.")
+            else:
+                self.print(f"ERROR: No ID provided for download query: \"{query}\"")
         return
 
     def get_SP_song_info(self, song: dict) -> dict:
@@ -189,18 +183,6 @@ class Converter():
             song_duration_sec += tokens[index] * (60**(len(tokens) - index - 1))
         return song_duration_sec
     
-    def handle_duplicates(self):
-        # dupes = []
-        # for song_ID in sp_playlist:
-        #     count = sp_playlist[song_ID]["count"]
-        #     if count > 1:
-        #         for _ in range(count-1):
-        #             dupes.append(song_ID)
-        #             if not self.keep_dupes:
-        #                 self.NOT_ADDED_SONGS[yt_playlist_name]["dupes"].append(sp_playlist[song_ID]['sp_query'])
-        # if self.keep_dupes and dupes:
-        #     while len(add_songs) > 100:
-        #         self.sp_client.user_playlist_add_tracks(user_ID, sp_playlist_ID, dupes[:100])
-        #         dupes = dupes[100:]
-        #     self.sp_client.user_playlist_add_tracks(user_ID, sp_playlist_ID, dupes)
+    def print(self, message: str) -> None:
+        print(colored(message, "green"))
         return
