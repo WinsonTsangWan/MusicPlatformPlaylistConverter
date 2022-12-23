@@ -16,13 +16,16 @@ class Converter():
     ''' NOT_ADDED_SONGS: dict of playlists and their songs that were not added for the given reasons
     - (dict) NOT_ADDED_SONGS = {
         (str) playlist_name: (dict) {
-            (str) "unfounded": [(str) query strings], 
-            (str) "dupes": [(str) query strings], 
-            (str) "downloads": [(str) video IDs]
+            (str) "unfounded": [(dict) {(str) query: (str) ID}], 
+            (str) "dupes": [(dict) {(str) query: (str) ID}], 
+            (str) "downloads": [(dict) {(str) query: (str) ID}]
         }
-        - "unfound" -> (list) list of song YT queries that were not added because they could not be found
-        - "dupes" -> (list) list of song YT queries that were not added because they were duplicates
-        - "downloads" -> (list) list of YT video IDs that were not added because they were not song type objects
+        - "unfound" -> (list) list of dicts (keys = queries : values = None) 
+            that were not added because they could not be found
+        - "dupes" -> (list) list of dicts (keys = queries : values = destination IDs) 
+            that were not added because they were duplicates
+        - "downloads" -> (list) list of dicts (keys = queries : values = source (YT) IDs) 
+            that were not added because they were not song type objects
     '''
     NOT_ADDED_SONGS = {}
 
@@ -64,19 +67,19 @@ class Converter():
                 print_dupes = dupes and not self.keep_dupes
                 print_downloads = downloads and not self.download_videos
                 if print_unfound or print_dupes or print_downloads:
-                    self.print("\n_______________PLAYLIST: {playlist}_______________")
+                    self.print(f"\n{'_'*15}PLAYLIST: {playlist}{'_'*15}")
                     if print_unfound:
                         self.print("\nThe following songs could not be found and were not added:")
                         for index, song_query in enumerate(unfound):
-                            self.print(f"{index + 1}. {song_query}")
+                            self.print(f"   {index + 1}. {song_query['query']}")
                     if print_dupes:
                         self.print("\nThe following songs were duplicates and were not added:")
                         for index, song_query in enumerate(dupes):
-                            self.print(f"{index + 1}. {song_query}")
+                            self.print(f"   {index + 1}. {song_query['query']}")
                     if print_downloads:
                         self.print("\nThe following songs were not song type objects and were not added nor downloaded:")
                         for index, song_query in enumerate(downloads):
-                            self.print(f"{index + 1}. {song_query}")
+                            self.print(f"   {index + 1}. {song_query['query']}")
         return
 
     def print_not_added_albums(self) -> None:
@@ -111,21 +114,14 @@ class Converter():
         '''
         if playlist_name not in self.NOT_ADDED_SONGS:
             self.NOT_ADDED_SONGS[playlist_name] = {"unfound":[], "dupes":[], "downloads":[]}
+        query_ID_pair = {"query":query, "id":ID}
+        self.NOT_ADDED_SONGS[playlist_name][reason].append(query_ID_pair)
         if reason == "unfound":
-            self.NOT_ADDED_SONGS[playlist_name]["unfound"].append(query)
-            self.print(f"ERROR: \"{query}\" not found.")
+            self.print(f"ERROR: {query} not found.")
         elif reason == "dupes":
-            if ID:
-                self.NOT_ADDED_SONGS[playlist_name]["unfound"].append(ID)
-                self.print(f"\"{query}\" not added because it was a duplicate.")
-            else:
-                self.print(f"ERROR: No ID provided for duplicate query: \"{query}\"")
+            self.print(f"{query} not added because it was a duplicate.")
         elif reason == "downloads":
-            if ID:
-                self.NOT_ADDED_SONGS[playlist_name]["downloads"].append(ID)
-                self.print(f"\"{query}\" not added because it was a video type object, not a song type object.")
-            else:
-                self.print(f"ERROR: No ID provided for download query: \"{query}\"")
+            self.print(f"{query} not added because it was a video type object, not a song type object.")
         return
 
     def get_SP_song_info(self, song: dict) -> dict:
@@ -184,5 +180,32 @@ class Converter():
         return song_duration_sec
     
     def print(self, message: str) -> None:
+        '''
+        Short helper function to print a colored string without the clutter.\n
+        Parameters:
+        - (str) message: string to be printed\n
+        Return:
+        - None
+        '''
         print(colored(message, "green"))
         return
+
+    def remove_parentheses(self, song_title: str) -> str:
+        '''
+        Short helper function to remove parenthetical segments from song titles.
+        (eg. )\n
+        Parameters:
+        - (str) song_title: Song titles from which to remove parenthetical segments\n
+        Return:
+        - (str) song_title with parenthetical segments removed
+        '''
+        result = ""
+        stop = 0
+        for char in song_title:
+            if char == "(":
+                stop += 1
+            elif stop == 0:
+                result += char
+            elif char == ")":
+                stop -= 1
+        return result

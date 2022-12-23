@@ -34,7 +34,7 @@ SP_CLIENT = spotipy.Spotify(auth_manager=SpotifyOAuth(scope=SP_SCOPE))
 #                exponentially punish differences in song duration on all results (this should 
 #                favor long music videos over results with similar duration but are completely incorrect)
 #    - Solution: for video results, search only the video title
-# 4. [DONE] if YouTube query cannot be found on Spotify, automatically download YouTube video
+# 4. [DONE] if YouTube query cannot be found on Spotify, offer to download YouTube video instead
 
 def main():
     job = input(colored("\nHello! Welcome to the Spotify-Youtube playlist coverter.\n" 

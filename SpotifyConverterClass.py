@@ -1,8 +1,6 @@
 import math
-
 from pprint import pprint
 from ConverterClass import Converter
-from termcolor import colored
 
 class SpotifyConverter(Converter):
 
@@ -54,17 +52,16 @@ class SpotifyConverter(Converter):
             song = sp_track["track"]
             if song:
                 song_info = self.get_SP_song_info(song)
-                yt_query = f"{song['name']} by {song['artists'][0]['name']}"
-                yt_search_res = self.ytm_client.search(query=yt_query)
-                best_match_ID = self.find_best_match(yt_search_res, song_info)
+                full_yt_query = f"\"{song['name']}\" by {song['artists'][0]['name']}"
+                best_match_ID = self.do_multiple_queries(song_info)
                 if best_match_ID:
                     if best_match_ID not in yt_playlist:
                         yt_playlist.append(best_match_ID)
                         self.print(f"Copying song {index + 1}/{len(sp_tracks)}")
                     else:
-                        self.print_unadded_song_error(sp_playlist_name, "dupes", yt_query, best_match_ID)
+                        self.print_unadded_song_error(sp_playlist_name, "dupes", full_yt_query, best_match_ID)
                 else:
-                    self.print_unadded_song_error(sp_playlist_name, "unfound", yt_query)
+                    self.print_unadded_song_error(sp_playlist_name, "unfound", full_yt_query)
             else:
                 self.print_unadded_song_error(sp_playlist_name, "unfound", f"Song #{index + 1}")
         yt_playlist_ID = self.create_YT_playlist(yt_playlist, sp_playlist_name)
@@ -111,6 +108,29 @@ class SpotifyConverter(Converter):
                     self.NOT_ADDED_ALBUMS.append(yt_query)
         return
 
+    def do_multiple_queries(self, song_info: dict) -> str:
+        '''
+        NOTE: THIS FUNCTION HAS NOT BEEN USED;
+        Given a song name and artist, perform multiple YouTube Music queries and run find_best_match on 
+        all search results, and then choose the best scoring search results.\n
+        Parameters:
+        - (dict) song_info: dictionary with song name, artist, album and duration of the target song\n
+        Return:
+        - (str) YouTube Music song/video ID of search result with best holistic score (ie. best match to the song in song_info)
+        '''
+        query_1 = f"{song_info['title']} {song_info['artist']}"
+        query_2 = f"{song_info['title']} by {song_info['artist']}"
+
+        queries_lst = [query_1, query_2]
+        local_best_scores_dict = {}
+        for query in queries_lst:
+            # self.print(f"\nQUERY: {query}")
+            yt_search_res = self.ytm_client.search(query=query)
+            local_best_match_ID, local_best_score = self.find_best_match(yt_search_res, song_info)
+            local_best_scores_dict[local_best_match_ID] = local_best_score
+        overall_best_match_ID = max(local_best_scores_dict, key=local_best_scores_dict.get)
+        return overall_best_match_ID
+
     def find_best_match(self, yt_search_res: list, song_info: dict) -> str:
         '''
         Given a list of YouTube Music search results and a target song to match, holistically score each 
@@ -131,10 +151,10 @@ class SpotifyConverter(Converter):
                 if res_score > best_score:
                     best_score = res_score
                     best_match_ID = res_info["id"]
-                # print(f"{res_info['title']} by {res_info['artist']}: {res_score}")
+                # self.print(f"{res_info['title']} by {res_info['artist']}: {res_score}")
         if best_score < 0:
-            return None
-        return best_match_ID
+            return None, float("-inf")
+        return best_match_ID, best_score
     
     def score(self, song_info: dict, res_info: dict, offset: list) -> float:
         close_title = song_info["title"] in res_info["title"]
@@ -145,6 +165,7 @@ class SpotifyConverter(Converter):
         is_song = res_info["type"] == "song"
         is_top_result = res_info["top_result"]
         major = 0
+        # Parameters
         if is_top_result:
             major += 2
         if offset[0] > 0:
@@ -163,6 +184,7 @@ class SpotifyConverter(Converter):
         # Ignore results with major <= 1 (to be conservative with matches)
         if major <= 1:
             return float("-inf")
+        # Prefer YouTube Music song results over video results 
         if is_song:
             if major >= 3:
                 major += 30
