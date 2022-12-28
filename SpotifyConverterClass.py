@@ -1,9 +1,10 @@
-import math
-from pprint import pprint
 from ConverterClass import Converter
 
 class SpotifyConverter(Converter):
 
+    '''
+    Convert all Spotify playlists, liked songs, and liked albums to YouTube Music
+    '''
     def convert_SP_to_YT_library(self) -> None:
         '''
         Converts current user's Spotify library (liked songs, liked albums, all playlists) to 
@@ -32,7 +33,10 @@ class SpotifyConverter(Converter):
         self.print_not_added_albums()
         return 
 
-    def convert_SP_to_YT_playlist(self,  sp_playlist_ID: str) -> str:
+    '''
+    Convert single Spotify playlist or liked songs to YouTube Music
+    '''
+    def convert_SP_to_YT_playlist(self, sp_playlist_ID: str) -> str:
         '''
         Given a Spotify playlist ID, create a YouTube Music playlist with the same songs\n
         Parameters:
@@ -53,7 +57,7 @@ class SpotifyConverter(Converter):
             if song:
                 song_info = self.get_SP_song_info(song)
                 full_yt_query = f"\"{song['name']}\" by {song['artists'][0]['name']}"
-                best_match_ID = self.do_multiple_queries(song_info)
+                best_match_ID = self.find_best_match_ID(song_info, self.get_multiple_YT_search_results)
                 if best_match_ID:
                     if best_match_ID not in yt_playlist:
                         yt_playlist.append(best_match_ID)
@@ -66,16 +70,62 @@ class SpotifyConverter(Converter):
                 self.print_unadded_song_error(sp_playlist_name, "unfound", f"Song #{index + 1}")
         yt_playlist_ID = self.create_YT_playlist(yt_playlist, sp_playlist_name)
         return yt_playlist_ID
-
-    def convert_SP_liked_albums(self) -> list:
+    
+    def get_multiple_YT_search_results(self, song_info: dict) -> list[list[dict]]:
         '''
-        Given a list of Spotify Liked Albums, add all albums to YouTube Music Liked Albums, 
-        and returns a list of albums that were not added.\n
+        Given a song name and artist, perform multiple YouTube Music queries. Next, filter all 
+        search results to keep only videoTypes of "song" and "video". Then, get the song info of all
+        remaining search results and aggregate them into a single list of search result song info dicts.\n
+        Parameters:
+        - (dict) song_info: dictionary with info about the target Spotify song\n
+        Return:
+        - (list) list of YouTube Music song_info dicts for all search results from the multiple queries  
+        '''
+        query_1 = f"{song_info['title']} {song_info['artist']}"
+        query_2 = f"{song_info['title']} by {song_info['artist']}"
+        queries_lst = [query_1, query_2]
+        all_yt_search_res = []
+        for query in queries_lst:
+            single_search_raw = self.ytm_client.search(query=query, limit=self.LIMIT)
+            single_search_processed = [self.get_YT_song_info(res) for res in single_search_raw
+                if (res and (res["resultType"] == "video" or res["resultType"] == "song"))]
+            all_yt_search_res.append(single_search_processed)
+        return all_yt_search_res
+
+    def create_YT_playlist(self, yt_playlist: list, sp_playlist_name: str) -> str:
+        '''
+        Creates a YouTube playlist and handles duplicates based on self.keep_dupes.\n
+        Parameters:
+        - (list) YT_PLAYLIST: list of YouTube Music song/video IDs to add to new YouTube Music playlist
+        - (str) SP_PLAYLIST_NAME: name of Spotify playlist\n
+        Return:
+        - (str) playlist ID of newly created YouTube Music playlist\n
+        '''
+        self.print("Finishing up...")
+        # CREATE YOUTUBE MUSIC PLAYLIST WITH LIST OF SONGS (NO DUPLICATES YET)
+        yt_playlist_ID = self.ytm_client.create_playlist(
+            title=f"{sp_playlist_name} (copied from Spotify)",
+            description="Includes duplicates" if self.keep_dupes else "Does not include duplicates",
+            video_ids=yt_playlist)
+        # HANDLE DUPLICATES
+        for playlist in self.NOT_ADDED_SONGS:
+            dupes = self.NOT_ADDED_SONGS[playlist]["dupes"]
+            if self.keep_dupes and dupes:
+                self.ytm_client.add_playlist_items(playlistId=yt_playlist_ID, videoIds=dupes, duplicates=True)
+        self.print("Finished!")
+        return yt_playlist_ID
+
+    '''
+    Convert Spotify liked albums to YouTube Music
+    '''
+    def convert_SP_to_YT_liked_albums(self) -> None:
+        '''
+        Given a list of Spotify Liked Albums, add all albums to YouTube Music 
+        Liked Albums, and adds all unadded albums to self.NOT_ADDED_ALBUMS.\n
         Parameters:
         - None\n
         Return:
-        - (list) list of albums that were not added to YouTube Music Liked Albums
-                because a good match could not be found\n
+        - None\n
         '''
         liked_albums = self.get_all_SP_tracks("LIKED_ALBUMS")
         if liked_albums:
@@ -108,119 +158,9 @@ class SpotifyConverter(Converter):
                     self.NOT_ADDED_ALBUMS.append(yt_query)
         return
 
-    def do_multiple_queries(self, song_info: dict) -> str:
-        '''
-        NOTE: THIS FUNCTION HAS NOT BEEN USED;
-        Given a song name and artist, perform multiple YouTube Music queries and run find_best_match on 
-        all search results, and then choose the best scoring search results.\n
-        Parameters:
-        - (dict) song_info: dictionary with song name, artist, album and duration of the target song\n
-        Return:
-        - (str) YouTube Music song/video ID of search result with best holistic score (ie. best match to the song in song_info)
-        '''
-        query_1 = f"{song_info['title']} {song_info['artist']}"
-        query_2 = f"{song_info['title']} by {song_info['artist']}"
-
-        queries_lst = [query_1, query_2]
-        local_best_scores_dict = {}
-        for query in queries_lst:
-            # self.print(f"\nQUERY: {query}")
-            yt_search_res = self.ytm_client.search(query=query)
-            local_best_match_ID, local_best_score = self.find_best_match(yt_search_res, song_info)
-            local_best_scores_dict[local_best_match_ID] = local_best_score
-        overall_best_match_ID = max(local_best_scores_dict, key=local_best_scores_dict.get)
-        return overall_best_match_ID
-
-    def find_best_match(self, yt_search_res: list, song_info: dict) -> str:
-        '''
-        Given a list of YouTube Music search results and a target song to match, holistically score each 
-        search result and then return the result with the highest score (ie. the best match).\n
-        Parameters:
-        - (list) YT_SEARCH_RES: list of YouTube Music search results
-        - (dict) SONG_INFO: dictionary with song name, artist, album and duration\n
-        Return:
-        - (str) video ID of search result with best holistic score (ie. best match to the song in song_info)
-        '''
-        best_match_ID = None
-        best_score = float("-inf")
-        offset = [self.OFFSET]
-        for res in yt_search_res:
-            if res["resultType"] == "song" or res["resultType"] == "video":
-                res_info = self.get_YT_song_info(res)
-                res_score = self.score(song_info, res_info, offset)
-                if res_score > best_score:
-                    best_score = res_score
-                    best_match_ID = res_info["id"]
-                # self.print(f"{res_info['title']} by {res_info['artist']}: {res_score}")
-        if best_score < 0:
-            return None, float("-inf")
-        return best_match_ID, best_score
-    
-    def score(self, song_info: dict, res_info: dict, offset: list) -> float:
-        close_title = song_info["title"] in res_info["title"]
-        close_artist = song_info["artist"] in res_info["artist"]
-        same_title = song_info["title"] == res_info["title"]
-        same_artist = song_info["artist"] == res_info["artist"]
-        same_album = res_info["album"] and res_info["album"] == song_info["album"]
-        is_song = res_info["type"] == "song"
-        is_top_result = res_info["top_result"]
-        major = 0
-        # Parameters
-        if is_top_result:
-            major += 2
-        if offset[0] > 0:
-            major += offset[0]
-            offset[0] -= 1
-        if same_title:
-            major += 2
-        elif close_title:
-            major += 1
-        if same_artist:
-            major += 2
-        elif close_artist:
-            major += 1
-        if same_album:
-            major += 2
-        # Ignore results with major <= 1 (to be conservative with matches)
-        if major <= 1:
-            return float("-inf")
-        # Prefer YouTube Music song results over video results 
-        if is_song:
-            if major >= 3:
-                major += 30
-            else:
-                major += 1
-        major *= 2
-        try:
-            diff_factor = math.exp(abs(song_info["duration_seconds"]-res_info["duration_seconds"]))
-        except OverflowError:
-            diff_factor = float("inf")
-        score = (self.SCORE * major) - diff_factor
-        return score
-
-    def create_YT_playlist(self, yt_playlist: dict, sp_playlist_name: str) -> str:
-        '''
-        Creates a YouTube playlist and handles duplicates based on self.keep_dupes.\n
-        Parameters:
-        - (dict) YT_PLAYLIST: list of YouTube Music song/video IDs to add to newly created YouTube Music playlist
-        - (str) SP_PLAYLIST_NAME: name of Spotify playlist\n
-        Return:
-        - (str) playlist ID of newly created YouTube Music playlist\n
-        '''
-        self.print("Finishing up...")
-        # CREATE YOUTUBE MUSIC PLAYLIST WITH LIST OF SONGS (NO DUPLICATES YET)
-        yt_playlist_ID = self.ytm_client.create_playlist(
-            title=f"{sp_playlist_name} (copied from Spotify)",
-            description="Includes duplicates" if self.keep_dupes else "Does not include duplicates",
-            video_ids=yt_playlist)
-        # HANDLE DUPLICATES
-        for playlist in self.NOT_ADDED_SONGS:
-            dupes = self.NOT_ADDED_SONGS[playlist]["dupes"]
-            if self.keep_dupes and dupes:
-                self.ytm_client.add_playlist_items(playlistId=yt_playlist_ID, videoIds=dupes, duplicates=True)
-        self.print("Finished!")
-        return yt_playlist_ID
-
+    '''
+    Helper functions: Miscellaneous
+    '''
     def get_all_SP_tracks(self, sp_playlist_ID: str) -> list[dict]:
         '''
         Given a Spotify API client and playlist ID, return a list of all songs in the playlist.\n
