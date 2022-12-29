@@ -214,17 +214,20 @@ class YouTubeMusicConverter(Converter):
             - None
             '''
             if d["status"] == "finished":
-                self.print(f"\nFinished downloading song {index + 1}/{len(yt_download_IDs)}")
+                self.print(f"\nFinished downloading song {index + 1}: {video_dict['query']}")
             return
 
         if self.download_videos:
             for playlist in self.NOT_ADDED_SONGS:
                 self.YTDL_OPTIONS['outtmpl'] = f"/{playlist}/%(title)s.%(ext)s"
-                self.YTDL_OPTIONS['progress_hooks'] = [print_YT_download_progress]
-                yt_download_IDs = self.NOT_ADDED_SONGS[playlist]["downloads"]
-                self.print(f"\nDownloading {len(yt_download_IDs)} videos that are not song type objects...")
-                for index, video_dict in enumerate(yt_download_IDs):
-                    yt_video_URL = "https://www.youtube.com/watch?v=" + video_dict["id"]
-                    with youtube_dl.YoutubeDL(self.YTDL_OPTIONS) as ytdl:
-                        ytdl.download([yt_video_URL])
+                # self.YTDL_OPTIONS['progress_hooks'] = [print_YT_download_progress]
+                yt_downloads = self.NOT_ADDED_SONGS[playlist]["downloads"]
+                self.print(f"\n{'_'*5}Downloading {len(yt_downloads)} videos for playlist: {playlist}{'_'*5}...")
+                for index, video_dict in enumerate(yt_downloads):
+                    try:
+                        with youtube_dl.YoutubeDL(self.YTDL_OPTIONS) as ytdl:
+                            ytdl.download(["https://www.youtube.com/watch?v=" + video_dict["id"]])
+                        self.print(f"\nFinished downloading song {index + 1}: {video_dict['query']}")
+                    except:
+                        self.print(f"\nFailed to download song {index + 1}: {video_dict['query']}")
         return
