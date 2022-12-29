@@ -59,7 +59,7 @@ class SpotifyConverter(Converter):
                 full_yt_query = f"\"{song['name']}\" by {song['artists'][0]['name']}"
                 best_match_ID = self.find_best_match_ID(song_info, self.get_multiple_YT_search_results)
                 if best_match_ID:
-                    if best_match_ID not in yt_playlist:
+                    if best_match_ID not in yt_playlist or self.keep_dupes:
                         yt_playlist.append(best_match_ID)
                         self.print(f"Copying song {index + 1}/{len(sp_tracks)}")
                     else:
@@ -79,7 +79,8 @@ class SpotifyConverter(Converter):
         Parameters:
         - (dict) song_info: dictionary with info about the target Spotify song\n
         Return:
-        - (list) list of YouTube Music song_info dicts for all search results from the multiple queries  
+        - (list) list of lists of song_info dicts (each inner list is the search result of 
+            a query and contains multiple song_info dicts of songs from that search result) 
         '''
         query_1 = f"{song_info['title']} {song_info['artist']}"
         query_2 = f"{song_info['title']} by {song_info['artist']}"
@@ -109,7 +110,7 @@ class SpotifyConverter(Converter):
             video_ids=yt_playlist)
         # HANDLE DUPLICATES
         for playlist in self.NOT_ADDED_SONGS:
-            dupes = self.NOT_ADDED_SONGS[playlist]["dupes"]
+            dupes = [dupe["id"] for dupe in self.NOT_ADDED_SONGS[playlist]["dupes"]]
             if self.keep_dupes and dupes:
                 self.ytm_client.add_playlist_items(playlistId=yt_playlist_ID, videoIds=dupes, duplicates=True)
         self.print("Finished!")
@@ -121,7 +122,7 @@ class SpotifyConverter(Converter):
     def convert_SP_to_YT_liked_albums(self) -> None:
         '''
         Given a list of Spotify Liked Albums, add all albums to YouTube Music 
-        Liked Albums, and adds all unadded albums to self.NOT_ADDED_ALBUMS.\n
+        Liked Albums, and add all unadded albums to self.NOT_ADDED_ALBUMS.\n
         Parameters:
         - None\n
         Return:

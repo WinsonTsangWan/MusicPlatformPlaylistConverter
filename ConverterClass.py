@@ -10,7 +10,7 @@ class Converter():
     YT_SOURCE = "YouTube Music"
 
     ''' LIMIT: number of results to return in a Spotify search query '''
-    LIMIT = 20
+    LIMIT = 10
 
     ''' SCORE: constant by which we linearly increment scores when scoring search results '''
     SCORE = 100
@@ -106,7 +106,39 @@ class Converter():
     '''
     Helper functions: Song matching
     '''
-    def score(self, song_info: dict, res_info: dict, offset: int) -> float:
+    def find_best_match_ID(self, song_info: dict, multi_search_func) -> str:
+        '''
+        Given a list of search results and a target song to match, holistically score each 
+        search result and then return the result with the highest score (ie. the best match).\n
+        Parameters:
+        - (dict) SONG_INFO: dictionary with song name, artist, album and duration\n
+        - (function) MULTI_SEARCH_FUNC: function to get all search results for the song in song_info
+            - NOTE: MULTI_SEARCH_FUNC is our own defined function to perform searches using multiple
+                search queries (eg. self.get_multiple_YT_search_results or 
+                self.get_multiple_SP_search_results). It is NOT the native search function built-in to 
+                the API clients (eg. sp_client.search and ytm_client.search). Rather, these native 
+                search functions are called inside MULTI_SEARCH_FUNC.
+        Return:
+        - (str) ID of search result with best holistic score (ie. best match to the song in song_info)
+        '''
+        best_match_ID = None
+        best_score = 0
+        list_all_search_res = multi_search_func(song_info)
+        # print("\n")
+        for search_res in list_all_search_res:
+            offset = self.OFFSET
+            for res_info in search_res:
+                params = self.check_parameters(song_info, res_info)
+                res_score = self.score(params, offset)
+                offset -= 1
+                if res_score > best_score:
+                    best_score = res_score
+                    best_match_ID = res_info["id"]
+                # if res_score > float("-inf"):
+                    # self.print(f"{res_info['title']} by {res_info['artist']}: {res_score}")
+        return best_match_ID    
+
+    def score(self, params: dict, offset: int) -> float:
         '''
         Given two song dicts (representing the original song and one search result), 
         assign the result song a holistic quantitative score reflecting how much it 
@@ -120,79 +152,73 @@ class Converter():
             original song (higher score = better match, lower score = worse match)
         '''
         major = 0
-        close_title = (song_info["title"] in res_info["title"] or 
-                        res_info["title"] in song_info["title"])
-        close_artist = (song_info["artist"] in res_info["artist"] or 
-                        res_info["artist"] in song_info["artist"])
-        same_title = song_info["title"] == res_info["title"]
-        same_artist = song_info["artist"] == res_info["artist"]
-        same_album = (res_info["album"] and 
-                        song_info["album"] and 
-                        res_info["album"] == song_info["album"])
         # Parameters
-        if "top_result" in res_info:
-            is_top_result = res_info["top_result"]
-            if is_top_result:
-                major += 2
+        if params["is_top_result"]:
+            major += 2
         if offset > 0:
             major += offset
-        if same_title:
+        if params["same_title"]:
             major += 2
-        elif close_title:
+        elif params["close_title"] or params["same_title_lower"]:
             major += 1
-        if same_artist:
+        elif params["close_title_lower"]:
+            major += 0
+        if params["same_artist"]:
             major += 2
-        elif close_artist:
+        elif params["close_artist"] or params["same_artist_lower"]:
             major += 1
-        if same_album:
+        elif params["close_artist_lower"]:
+            major += 0
+        if params["same_album"]:
             major += 2
-        # Ignore results with major <= 2 (to be conservative with matches)
+        # Ignore results with major <= 1 (to be conservative with matches)
         if major <= 1:
             return float("-inf")
+        # print(major)
         # Prefer song types over non-song types
-        if "type" in res_info:
-            is_song = res_info["type"] == "song"
-            if is_song:
-                if major >= 3:
-                    major += 30
-                else:
-                    major += 1
+        if params["is_song"]:
+            if major >= 3:
+                major += 30
+            else:
+                major += 1
         major *= 2
-        try:
-            diff_factor = math.exp(abs(song_info["duration_seconds"]-res_info["duration_seconds"]))
-        except OverflowError:
-            diff_factor = float("inf")
-        score = (self.SCORE * major) - diff_factor
+        score = (self.SCORE * major) - params["diff_factor"]
         return score
 
-    def find_best_match_ID(self, song_info: dict, multi_search_func) -> str:
+    def check_parameters(self, song_info: dict, res_info: dict) -> dict:
         '''
-        Given a list of search results and a target song to match, holistically score each 
-        search result and then return the result with the highest score (ie. the best match).\n
+        Given two song_info dicts, return a new dict containing info about
+        how closely certain items in the two input dicts match.\n
         Parameters:
-        - (dict) SONG_INFO: dictionary with song name, artist, album and duration\n
-        - (function) MULTI_SEARCH_FUNC: function to get all search results for the song in song_info
-            NOTE: MULTI_SEARCH_FUNC is our own defined function to perform searches using multiple
-                search queries (eg. self.get_multiple_YT_search_results or 
-                self.get_multiple_SP_search_results). It is NOT the native search function built-in to 
-                the API clients (eg. sp_client.search and ytm_client.search). Rather, these native 
-                search functions are called inside MULTI_SEARCH_FUNC.
+        - (dict) song_info: dict with info of the original song
+        - (dict) res_info: dict with info of the search result song\n
         Return:
-        - (str) ID of search result with best holistic score (ie. best match to the song in song_info)
+        - (dict) dict of bools indicating which items in the input dicts do or don't match
         '''
-        best_match_ID = None
-        best_score = 0
-        list_all_search_res = multi_search_func(song_info)
-        for search_res in list_all_search_res:
-            offset = self.OFFSET
-            for res_info in search_res:
-                res_score = self.score(song_info, res_info, offset)
-                offset -= 1
-                if res_score > best_score:
-                    best_score = res_score
-                    best_match_ID = res_info["id"]
-                # self.print(f"{res_info['title']} by {res_info['artist']}: {res_score}")
-        return best_match_ID    
+        params = {}
+        params["same_title"] = (song_info["title"] == res_info["title"])
+        params["same_artist"] = (song_info["artist"] == res_info["artist"])
+        params["same_title_lower"] = (song_info["title"].lower() == res_info["title"].lower())
+        params["same_artist_lower"] = (song_info["artist"].lower() == res_info["artist"].lower())
+        params["same_album"] = (res_info["album"] and song_info["album"] and 
+                        res_info["album"] == song_info["album"])
+        params["close_title"] = (song_info["title"] in res_info["title"] or 
+                        res_info["title"] in song_info["title"])
+        params["close_artist"] = (song_info["artist"] in res_info["artist"] or 
+                        res_info["artist"] in song_info["artist"])
+        params["close_title_lower"] = (song_info["title"].lower() in res_info["title"].lower() or 
+                            res_info["title"].lower() in song_info["title"].lower())
+        params["close_artist_lower"] = (song_info["artist"].lower() in res_info["artist"].lower() or 
+                            res_info["artist"].lower() in song_info["artist"].lower())
+        params["is_song"] = ("type" in res_info and
+                    res_info["type"] == "song")
+        params["is_top_result"] = ("top_result" in res_info and 
+                        res_info["top_result"])
+        try:
+            params["diff_factor"] = math.exp(abs(song_info["duration_seconds"]-res_info["duration_seconds"]))
+        except OverflowError:
+            params["diff_factor"] = float("inf")
+        return params
 
     '''
     Helper functions: Printing

@@ -27,9 +27,6 @@ class YouTubeMusicConverter(Converter):
             yt_playlist_ID = yt_playlist["playlistId"]
             self.convert_YT_to_SP_playlist(yt_playlist_ID)
 
-        # Download YouTube Music videos that are not song types or official music videos
-        self.download_YT_videos()
-
         # Convert YouTube Music Liked Albums to Spotify Liked Albums
         self.convert_YT_to_SP_liked_albums()
 
@@ -38,6 +35,9 @@ class YouTubeMusicConverter(Converter):
 
         # Print unadded Spotify albums
         self.print_not_added_albums()
+
+        # Download YouTube Music videos that are not song types or official music videos
+        self.download_YT_videos()
         return 
 
     '''
@@ -72,7 +72,7 @@ class YouTubeMusicConverter(Converter):
                     yt_song["videoType"] == "MUSIC_VIDEO_TYPE_OMV"):
                     best_match_ID = self.find_best_match_ID(song_info, self.get_multiple_SP_search_results)
                     if best_match_ID:
-                        if best_match_ID not in sp_playlist:
+                        if best_match_ID not in sp_playlist or self.keep_dupes:
                             sp_playlist.append(best_match_ID)
                             self.print(f"Copying song {index + 1}/{len(yt_tracks)}")
                         else:
@@ -93,7 +93,8 @@ class YouTubeMusicConverter(Converter):
         Parameters:
         - (dict) song_info: dict with info about the target YouTube Music song\n
         Return:
-        - (list) list of Spotify song_info dicts for all search results from the multiple queries
+        - (list) list of lists of song_info dicts (each inner list is the search result of 
+            a query and contains multiple song_info dicts of songs from that search result)
         '''
         query_1 = f"{song_info['title']}"
         query_2 = f"{song_info['title']} {song_info['artist']}"
@@ -148,13 +149,12 @@ class YouTubeMusicConverter(Converter):
     '''
     def convert_YT_to_SP_liked_albums(self) -> None:
         '''
-        Given a list of YouTube Music Liked Albums, add all albums to Spotify Liked Albums, 
-        and returns a list of albums that were not added.\n
+        Given a list of YouTube Music Liked Albums, add all albums to Spotify 
+        Liked Albums, and add all unadded albums to self.NOT_ADDED_ALBUMS.\n
         Parameters:
         - None\n
         Return:
-        - (list) list of albums that were not added to Spotify Liked Albums
-                because a good match could not be found\n     
+        - None\n     
         '''
         liked_albums = self.ytm_client.get_library_albums(limit=None)
         if liked_albums:
