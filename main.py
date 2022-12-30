@@ -36,25 +36,26 @@ SP_CLIENT = spotipy.Spotify(auth_manager=SpotifyOAuth(scope=SP_SCOPE))
 # SP_CLIENT = spotipy.Spotify(client_credentials_manager=client_credentials_manager)
 
 # TODO:
-# 1. (?) Add Spotify liked songs to YouTube Music liked songs instead of separate playlist
+# 1. get Spotify login page for auth
 # 2. create GUI for easier user input handling
 # 3. [MOSTLY DONE] improve find_best_match() algorithm for matching search results with query:
 #    - for video results, search only the video title (instead of simply skipping and not adding)
-# 4. [DONE] if YouTube query cannot be found on Spotify, offer to download YouTube video instead
+# 4. (?) Add Spotify liked songs to YouTube Music liked songs instead of separate playlist
 
 def main():
     job = get_job()
     keep_dupes = get_keep_dupes_bool()
     if job == "Playlist":
-        input_URL = input(colored(f"\nCopy-and-paste the URL for the source playlist.\n\n", "green"))
-        parsed_URL = urllib.parse.urlparse(input_URL)
+        parsed_URL = get_playlist_URL()
         netloc = parsed_URL.netloc
         path = parsed_URL.path
         query = parsed_URL.query
         if netloc == "open.spotify.com" and path[:10] == "/playlist/":
-            do_playlist_spotify(path[10:], keep_dupes)
+            sp_playlist_ID = path[10:]
+            do_playlist_spotify(sp_playlist_ID, keep_dupes)
         elif netloc == "music.youtube.com" and path == "/playlist":
-            do_playlist_youtube(query[5:], keep_dupes)
+            yt_playlist_ID = query[5:]
+            do_playlist_youtube(yt_playlist_ID, keep_dupes)
     elif job == "Library":
         source = get_source()
         if source == "Spotify":
@@ -76,7 +77,7 @@ def get_job() -> None:
     job = input(colored("\nHello! Welcome to the Spotify-Youtube playlist coverter.\n\n" 
         + "Type 'L' to convert a library, or type 'P' to convert a playlist.\n\n", "green")).upper()
     while job != "L" and job != "P":
-        job = input(colored("\nMake sure you're entering either 'L' or 'P'.\n\n", "green"))
+        job = input(colored("\nERROR: Make sure you're entering either 'L' or 'P'.\n\n", "green")).upper()
     job = "Playlist" if job == "P" else "Library"
     return job
 
@@ -84,7 +85,7 @@ def get_keep_dupes_bool() -> None:
     keep_dupes = input(colored("\nShould we keep duplicates? " 
         + "Type 'Y' for yes, or 'N' for no.\n\n", "green")).upper()
     while keep_dupes != "Y" and keep_dupes != "N":
-        keep_dupes = input(colored("\nMake sure you're entering either 'Y' or 'N'.\n\n", "green"))
+        keep_dupes = input(colored("\nERROR: Make sure you're entering either 'Y' or 'N'.\n\n", "green")).upper()
     keep_dupes = True if keep_dupes == "Y" else False
     return keep_dupes
 
@@ -92,7 +93,7 @@ def get_yt_download_bool() -> None:
     download = input(colored(f"\nShould we download the mp3 for YouTube Music videos and songs " 
         + "that we can't find on Spotify? Type 'Y' for yes, or 'N' for no.\n\n", "green")).upper()
     while download != 'Y' and download != 'N':
-        download = input(colored("\nMake sure you're entering either 'Y' or 'N'.\n\n", "green"))
+        download = input(colored("\nERROR: Make sure you're entering either 'Y' or 'N'.\n\n", "green")).upper()
     download = True if download.upper() == 'Y' else False
     return download
 
@@ -100,9 +101,17 @@ def get_source() -> None:
     source = input(colored(f"\nType 'S' if the original library is in Spotify or " 
         + "type 'Y' if the original library is in YouTube Music.\n\n", "green")).upper()
     while source.upper() != "S" and source.upper() != "Y":
-        source = input(colored("\nMake sure you're entering either 'S' or 'Y'.\n\n", "green"))
+        source = input(colored("\nERROR: Make sure you're entering either 'S' or 'Y'.\n\n", "green")).upper()
     source = "Spotify" if source.upper() == "S" else "YouTube Music"
     return source
+
+def get_playlist_URL() -> None:
+    input_URL = input(colored(f"\nCopy-and-paste the URL for the source playlist.\n\n", "green"))
+    parsed_URL = urllib.parse.urlparse(input_URL)
+    while parsed_URL.netloc != "open.spotify.com" and parsed_URL.netloc != "music.youtube.com":
+        input_URL = input(colored("\nERROR: Make sure the URL leads to either a Spotify playlist or YouTube Music playlist.\n\n", "green"))
+        parsed_URL= urllib.parse.urlparse(input_URL)
+    return parsed_URL
 
 '''
 Convert playlist
@@ -114,11 +123,7 @@ def do_playlist_spotify(sp_playlist_ID: str, keep_dupes: bool) -> None:
     return
 
 def do_playlist_youtube(yt_playlist_ID: str, keep_dupes: bool) -> None:
-    download = input(colored(f"\nShould we download the mp3 for YouTube Music videos and songs " 
-        + "that we can't find on Spotify? Type 'Y' for yes, or 'N' for no.\n\n", "green"))
-    while download.upper() != 'Y' and download.upper() != 'N':
-        download = input(colored("\nMake sure you're entering either 'Y' or 'N'.\n\n", "green"))
-    download = True if download.upper() == 'Y' else False
+    download = get_yt_download_bool()
     yt_converter = YouTubeMusicConverter(YTM_CLIENT, SP_CLIENT, keep_dupes, download)
     yt_converter.convert_YT_to_SP_playlist(yt_playlist_ID)
     yt_converter.download_YT_videos()
@@ -129,16 +134,12 @@ def do_playlist_youtube(yt_playlist_ID: str, keep_dupes: bool) -> None:
 Convert library
 '''
 def do_library_spotify(keep_dupes: bool) -> None:
-    print(keep_dupes)
     sp_converter = SpotifyConverter(YTM_CLIENT, SP_CLIENT, keep_dupes)
     sp_converter.convert_SP_to_YT_library()
     return
 
 def do_library_youtube(keep_dupes: bool) -> None:
     download = get_yt_download_bool()
-    while download.upper() != 'Y' and download.upper() != 'N':
-        download = input(colored("\nMake sure you're entering either 'Y' or 'N'.\n\n", "green"))
-    download = True if download.upper() == 'Y' else False
     yt_converter = YouTubeMusicConverter(YTM_CLIENT, SP_CLIENT, keep_dupes, download)
     yt_converter.convert_YT_to_SP_library()
     return
