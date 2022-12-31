@@ -3,17 +3,18 @@ start_time = time.time()
 import sys
 import spotipy
 import urllib
+import os 
+os.system("")
 
 from SpotifyConverterClass import SpotifyConverter
 from YouTubeConverterClass import YouTubeMusicConverter
-
 from spotipy.oauth2 import SpotifyOAuth
 from spotipy.oauth2 import SpotifyClientCredentials
 from ytmusicapi import YTMusic
 from termcolor import colored
 from dotenv import load_dotenv
 load_dotenv()
-# YTMusic.setup(filepath="headers_auth.json")
+YTMusic.setup(filepath="headers_auth.json")
 
 ''' YTM_CLIENT: unofficial YouTube Music API (ytmusicapi library) client '''
 YTM_CLIENT = YTMusic('headers_auth.json')
@@ -36,40 +37,45 @@ SP_CLIENT = spotipy.Spotify(auth_manager=SpotifyOAuth(scope=SP_SCOPE))
 # SP_CLIENT = spotipy.Spotify(client_credentials_manager=client_credentials_manager)
 
 # TODO:
-# 1. get Spotify login page for auth
-# 2. create GUI for easier user input handling
-# 3. [MOSTLY DONE] improve find_best_match() algorithm for matching search results with query:
+# 1. fix authorization for Spotify 
+# 2. fix authorization for YouTube Music (use Google API instead of unofficial ytmusicapi)
+# 3. create GUI for easier user input handling
+#    - job, keep_dupes, source, destination, download_yt_videos if source is yt
+#    - add Spotify liked songs to YouTube Music liked videos or separate playlist
+# 4. [MOSTLY DONE] improve find_best_match() algorithm for matching search results with query:
 #    - for video results, search only the video title (instead of simply skipping and not adding)
-# 4. (?) Add Spotify liked songs to YouTube Music liked songs instead of separate playlist
 
 def main():
-    job = get_job()
-    keep_dupes = get_keep_dupes_bool()
-    if job == "Playlist":
-        parsed_URL = get_playlist_URL()
-        netloc = parsed_URL.netloc
-        path = parsed_URL.path
-        query = parsed_URL.query
-        if netloc == "open.spotify.com" and path[:10] == "/playlist/":
-            sp_playlist_ID = path[10:]
-            do_playlist_spotify(sp_playlist_ID, keep_dupes)
-        elif netloc == "music.youtube.com" and path == "/playlist":
-            yt_playlist_ID = query[5:]
-            do_playlist_youtube(yt_playlist_ID, keep_dupes)
-    elif job == "Library":
-        source = get_source()
-        if source == "Spotify":
-            do_library_spotify(keep_dupes)
-        elif source == "YouTube Music":
-            do_library_youtube(keep_dupes)
+    check_exit = False
+    while not check_exit:
+        job = get_job()
+        keep_dupes = get_keep_dupes_bool()
+        if job == "Playlist":
+            parsed_URL = get_playlist_URL()
+            netloc = parsed_URL.netloc
+            path = parsed_URL.path
+            query = parsed_URL.query
+            if netloc == "open.spotify.com" and path[:10] == "/playlist/":
+                sp_playlist_ID = path[10:]
+                do_playlist_spotify(sp_playlist_ID, keep_dupes)
+            elif netloc == "music.youtube.com" and path == "/playlist":
+                yt_playlist_ID = query[5:]
+                do_playlist_youtube(yt_playlist_ID, keep_dupes)
+        elif job == "Library":
+            source = get_source()
+            if source == "Spotify":
+                do_library_spotify(keep_dupes)
+            elif source == "YouTube Music":
+                do_library_youtube(keep_dupes)
+        check_exit = prompt_exit()
     return
 
 '''
 Helper functions: Utils
 '''
 def get_run_time() -> None:
-    minutes = int((time.time()-start_time)//60)
-    seconds = int((time.time()-start_time)%60)
+    minutes = int((time.time() - start_time) // 60)
+    seconds = int((time.time() - start_time) % 60)
     print(f"\nProgram run time: {minutes} minutes and {seconds} seconds")
     return
 
@@ -113,6 +119,13 @@ def get_playlist_URL() -> None:
         parsed_URL= urllib.parse.urlparse(input_URL)
     return parsed_URL
 
+def prompt_exit() -> None:
+    check_exit = input(colored(f"\nType 'exit' to exit, or 'again' to convert something else.\n\n", "green"))
+    while check_exit != "exit" and check_exit != "again":
+        check_exit = input(colored(f"\nERROR: Make sure you're entering either 'exit' or 'again'.\n\n", "green"))
+    check_exit = True if check_exit == "exit" else False
+    return check_exit
+
 '''
 Convert playlist
 '''
@@ -126,8 +139,8 @@ def do_playlist_youtube(yt_playlist_ID: str, keep_dupes: bool) -> None:
     download = get_yt_download_bool()
     yt_converter = YouTubeMusicConverter(YTM_CLIENT, SP_CLIENT, keep_dupes, download)
     yt_converter.convert_YT_to_SP_playlist(yt_playlist_ID)
-    yt_converter.download_YT_videos()
     yt_converter.print_not_added_songs()
+    yt_converter.download_YT_videos()
     return
 
 '''

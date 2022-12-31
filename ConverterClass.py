@@ -134,8 +134,7 @@ class Converter():
                 if res_score > best_score:
                     best_score = res_score
                     best_match_ID = res_info["id"]
-                # if res_score > float("-inf"):
-                    # self.print(f"{res_info['title']} by {res_info['artist']}: {res_score}")
+                # self.print(f"{res_info['title']} by {res_info['artist']}: {res_score}")
         return best_match_ID    
 
     def score(self, params: dict, offset: int) -> float:
@@ -177,7 +176,7 @@ class Converter():
         # print(major)
         # Prefer song types over non-song types
         if params["is_song"]:
-            if major >= 3:
+            if major >= 4:
                 major += 30
             else:
                 major += 1
@@ -292,7 +291,7 @@ class Converter():
         self.NOT_ADDED_SONGS[playlist_name][reason].append(query_ID_pair)
         if reason == "unfound":
             self.print(f"ERROR: {query} not found.")
-        elif reason == "dupes":
+        elif reason == "dupes" and not self.keep_dupes:
             self.print(f"{query} not added because it was a duplicate.")
         elif reason == "downloads":
             self.print(f"{query} not added because it was a video type object, not a song type object.")
@@ -310,7 +309,7 @@ class Converter():
         return
     
     '''
-    Helper functions: Miscellaneous
+    Helper functions: Utils
     '''
     def get_sec_from_raw_duration(self, song_duration_raw: str) -> int:
         '''

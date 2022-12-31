@@ -77,6 +77,8 @@ class YouTubeMusicConverter(Converter):
                             self.print(f"Copying song {index + 1}/{len(yt_tracks)}")
                         else:
                             self.print_unadded_song_error(yt_playlist_name, "dupes", full_sp_query, best_match_ID)
+                            if self.keep_dupes:
+                                self.print(f"Copying song {index + 1}/{len(yt_tracks)}")
                     else:
                         self.print_unadded_song_error(yt_playlist_name, "unfound", full_sp_query)
                 else:
@@ -135,12 +137,11 @@ class YouTubeMusicConverter(Converter):
                 sp_playlist = sp_playlist[100:]
             self.sp_client.user_playlist_add_tracks(user_ID, sp_playlist_ID, sp_playlist)
         # HANDLE DUPLICATES
-        for playlist in self.NOT_ADDED_SONGS:
-            dupes = [dupe["id"] for dupe in self.NOT_ADDED_SONGS[playlist]["dupes"]]
-            if self.keep_dupes and dupes:
-                while len(dupes) > 100:
-                    self.sp_client.user_playlist_add_tracks(user_ID, sp_playlist_ID, dupes[:100])
-                    dupes = dupes[100:]
+        dupes = [dupe["id"] for dupe in self.NOT_ADDED_SONGS[yt_playlist_name]["dupes"]]
+        if self.keep_dupes and dupes:
+            while len(dupes) > 100:
+                self.sp_client.user_playlist_add_tracks(user_ID, sp_playlist_ID, dupes[:100])
+                dupes = dupes[100:]
         self.print("Finished!")
         return sp_playlist_ID
 
@@ -185,7 +186,7 @@ class YouTubeMusicConverter(Converter):
         return
 
     '''
-    Helper functions: Miscellaneous
+    Helper functions: Utils
     '''
     def download_YT_videos(self) -> None:
         '''

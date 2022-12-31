@@ -24,7 +24,7 @@ class SpotifyConverter(Converter):
             self.convert_SP_to_YT_playlist(sp_playlist_ID)
 
         # Convert Spotify Liked Albums to YouTube Music Liked Albums
-        self.convert_SP_liked_albums()
+        self.convert_SP_to_YT_liked_albums()
 
         # Print unadded songs from each playlist
         self.print_not_added_songs()
@@ -59,11 +59,13 @@ class SpotifyConverter(Converter):
                 full_yt_query = f"\"{song['name']}\" by {song['artists'][0]['name']}"
                 best_match_ID = self.find_best_match_ID(song_info, self.get_multiple_YT_search_results)
                 if best_match_ID:
-                    if best_match_ID not in yt_playlist or self.keep_dupes:
+                    if best_match_ID not in yt_playlist:
                         yt_playlist.append(best_match_ID)
                         self.print(f"Copying song {index + 1}/{len(sp_tracks)}")
                     else:
                         self.print_unadded_song_error(sp_playlist_name, "dupes", full_yt_query, best_match_ID)
+                        if self.keep_dupes:
+                            self.print(f"Copying song {index + 1}/{len(sp_tracks)}")
                 else:
                     self.print_unadded_song_error(sp_playlist_name, "unfound", full_yt_query)
             else:
@@ -109,11 +111,11 @@ class SpotifyConverter(Converter):
             description="Includes duplicates" if self.keep_dupes else "Does not include duplicates",
             video_ids=yt_playlist)
         # HANDLE DUPLICATES
-        for playlist in self.NOT_ADDED_SONGS:
-            dupes = [dupe["id"] for dupe in self.NOT_ADDED_SONGS[playlist]["dupes"]]
+        if sp_playlist_name in self.NOT_ADDED_SONGS:
+            dupes = [dupe["id"] for dupe in self.NOT_ADDED_SONGS[sp_playlist_name]["dupes"]]
             if self.keep_dupes and dupes:
                 self.ytm_client.add_playlist_items(playlistId=yt_playlist_ID, videoIds=dupes, duplicates=True)
-        self.print("Finished!")
+            self.print("Finished!")
         return yt_playlist_ID
 
     '''
@@ -160,7 +162,7 @@ class SpotifyConverter(Converter):
         return
 
     '''
-    Helper functions: Miscellaneous
+    Helper functions: Utils
     '''
     def get_all_SP_tracks(self, sp_playlist_ID: str) -> list[dict]:
         '''
