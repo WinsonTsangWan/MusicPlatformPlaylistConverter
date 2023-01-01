@@ -3,7 +3,8 @@ start_time = time.time()
 import sys
 import spotipy
 import urllib
-import os 
+import logging
+import os
 os.system("")
 
 from SpotifyConverterClass import SpotifyConverter
@@ -14,7 +15,7 @@ from ytmusicapi import YTMusic
 from termcolor import colored
 from dotenv import load_dotenv
 load_dotenv()
-YTMusic.setup(filepath="headers_auth.json")
+# YTMusic.setup(filepath="headers_auth.json")
 
 ''' YTM_CLIENT: unofficial YouTube Music API (ytmusicapi library) client '''
 YTM_CLIENT = YTMusic('headers_auth.json')
@@ -37,6 +38,8 @@ SP_CLIENT = spotipy.Spotify(auth_manager=SpotifyOAuth(scope=SP_SCOPE))
 # SP_CLIENT = spotipy.Spotify(client_credentials_manager=client_credentials_manager)
 
 # TODO:
+# 0. add README file
+# 0. write print errors to log file
 # 1. fix authorization for Spotify 
 # 2. fix authorization for YouTube Music (use Google API instead of unofficial ytmusicapi)
 # 3. create GUI for easier user input handling
@@ -46,6 +49,12 @@ SP_CLIENT = spotipy.Spotify(auth_manager=SpotifyOAuth(scope=SP_SCOPE))
 #    - for video results, search only the video title (instead of simply skipping and not adding)
 
 def main():
+    logging.basicConfig(
+        filename="log.log", 
+        level=logging.INFO,
+        format=u"%(message)s",
+        filemode="w",
+        encoding="utf-8")
     check_exit = False
     while not check_exit:
         job = get_job()
@@ -77,6 +86,7 @@ def get_run_time() -> None:
     minutes = int((time.time() - start_time) // 60)
     seconds = int((time.time() - start_time) % 60)
     print(f"\nProgram run time: {minutes} minutes and {seconds} seconds")
+    logging.info(f"\nProgram run time: {minutes} minutes and {seconds} seconds")
     return
 
 def get_job() -> None:

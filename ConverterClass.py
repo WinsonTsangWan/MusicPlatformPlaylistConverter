@@ -1,4 +1,5 @@
 import math
+import logging
 
 from termcolor import colored
 
@@ -240,7 +241,7 @@ class Converter():
                 print_dupes = dupes and not self.keep_dupes
                 print_downloads = downloads and not self.download_videos
                 if print_unfound or print_dupes or print_downloads:
-                    self.print(f"\n{'_'*5}PLAYLIST: {playlist}{'_'*5}")
+                    self.print(f"\n{'_'*17}PLAYLIST: {playlist}{'_'*17}")
                     if print_unfound:
                         self.print("\nThe following songs could not be found and were not added:")
                         for index, song_query in enumerate(unfound):
@@ -299,13 +300,14 @@ class Converter():
 
     def print(self, message: str) -> None:
         '''
-        Short helper function to print a colored string without the clutter.\n
+        Short helper function to print a colored string and log without the clutter.\n
         Parameters:
         - (str) message: string to be printed\n
         Return:
         - None
         '''
         print(colored(message, "green"))
+        logging.info(message)
         return
     
     '''
