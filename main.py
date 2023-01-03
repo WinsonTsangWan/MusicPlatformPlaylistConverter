@@ -1,6 +1,5 @@
 import time
 start_time = time.time()
-import sys
 import spotipy
 import urllib
 import logging
@@ -21,25 +20,17 @@ load_dotenv()
 YTM_CLIENT = YTMusic('headers_auth.json')
 
 ''' SP_CLIENT: (Original Method) Spotify API client with scope SP_SCOPE '''
-SP_SCOPE = "playlist-read-private playlist-modify-private user-library-read user-library-modify"
-SP_CLIENT = spotipy.Spotify(auth_manager=SpotifyOAuth(scope=SP_SCOPE))
+# SP_SCOPE = "playlist-read-private playlist-modify-private user-library-read user-library-modify"
+# SP_CLIENT = spotipy.Spotify(auth_manager=SpotifyOAuth(scope=SP_SCOPE))
 
 ''' SP_CLIENT: (Authorization Code Flow) Spotify API client with scopes SP_SCOPE '''
-# SP_SCOPE = "playlist-read-private playlist-modify-private user-library-read user-library-modify"
-# SP_TOKEN = spotipy.util.prompt_for_user_token(scope=SP_SCOPE)
-# if SP_TOKEN:
-#     SP_CLIENT = spotipy.Spotify(auth=SP_TOKEN)
-# else:
-#     print(colored(f"\nCouldn't get token.\n"))
-#     sys.exit(1)
-
-''' SP_CLIENT: (Client Credentials Flow) Spotify API client '''
-# client_credentials_manager = SpotifyClientCredentials()
-# SP_CLIENT = spotipy.Spotify(client_credentials_manager=client_credentials_manager)
+SP_SCOPE = "playlist-read-private playlist-modify-private user-library-read user-library-modify"
+SP_TOKEN = spotipy.util.prompt_for_user_token(scope=SP_SCOPE)
+SP_CLIENT = spotipy.Spotify(auth=SP_TOKEN)
 
 # TODO:
-# 0. add README file
-# 0. write print errors to log file
+# 0. [DONE] add README file
+# 0. [DONE] write print errors to log file
 # 1. fix authorization for Spotify 
 # 2. fix authorization for YouTube Music (use Google API instead of unofficial ytmusicapi)
 # 3. create GUI for easier user input handling
@@ -77,6 +68,7 @@ def main():
             elif source == "YouTube Music":
                 do_library_youtube(keep_dupes)
         check_exit = prompt_exit()
+    get_run_time()
     return
 
 '''
@@ -169,5 +161,4 @@ def do_library_youtube(keep_dupes: bool) -> None:
 
 if __name__ == '__main__':
     main()
-    get_run_time()
     
