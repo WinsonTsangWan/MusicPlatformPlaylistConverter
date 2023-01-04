@@ -9,64 +9,109 @@ class ConverterGUI():
         self.app = qt_widgets.QApplication([])
         self.window = qt_widgets.QWidget()
         self.window_layout = qt_widgets.QVBoxLayout()
+        self.create_window()
+
+        self.ytmusic_auth_textbox = qt_widgets.QLineEdit("")
+
+        self.platforms = ["Spotify", "YouTube Music", "Apple Music"]
+        self.src_buttons = {platform: qt_widgets.QRadioButton(platform) for platform in self.platforms}
+        self.dest_buttons = {platform: qt_widgets.QRadioButton(platform) for platform in self.platforms}
+        
+        self.jobs = ["Playlist", "Library", "Liked Songs", "Liked Albums"]
+        self.jobs_buttons = {job: qt_widgets.QRadioButton(job) for job in self.jobs}
+        self.playlist_URL_textbox = qt_widgets.QLineEdit("")
+        self.playlist_URL_group_box = qt_widgets.QGroupBox("Paste the playlist URL")
+
+        self.options = ["Keep duplicates", "Download YouTube videos and songs that cannot be found"]
+        self.options_buttons = {option: qt_widgets.QCheckBox(option) for option in self.options}
+        self.keep_dupes_button = self.options_buttons["Keep duplicates"]
+        self.downloads_button = self.options_buttons["Download YouTube videos and songs that cannot be found"]
+        self.downloads_button.hide()
+
+        self.convert_button = qt_widgets.QPushButton("\nCONVERT\n")
+
+        self.create_ytmusic_auth_group()
+        self.create_src_dest_group()
+        self.create_job_group()
+        self.create_options_group()
+        self.create_convert_button()
+
+        self.app.exec()
+        pass
+
+    def create_ytmusic_auth_group(self):
+        ytmusic_auth_group_layout = qt_widgets.QVBoxLayout()
+        ytmusic_auth_group_box = qt_widgets.QGroupBox("Paste YouTube Music authentication request headers")
+        ytmusic_auth_group_box.setLayout(ytmusic_auth_group_layout)
+        ytmusic_auth_group_layout.addWidget(self.ytmusic_auth_textbox, alignment=Qt.AlignTop)
+        self.window_layout.addWidget(ytmusic_auth_group_box)
+        return self.ytmusic_auth_textbox
+
+    def create_src_dest_group(self):
+        # Create outer group
+        src_dest_group_layout = qt_widgets.QVBoxLayout()
+        src_dest_group_box = qt_widgets.QGroupBox("Step 1. Select conversion source and destination")
+        src_dest_group_box.setLayout(src_dest_group_layout)
+        self.window_layout.addWidget(src_dest_group_box)
+        # Create source buttons group
+        src_group_layout = qt_widgets.QVBoxLayout()
+        src_group_box = qt_widgets.QGroupBox("Source")
+        src_group_box.setLayout(src_group_layout)
+        src_dest_group_layout.addWidget(src_group_box, alignment=Qt.AlignTop)
+        # Create destination buttons group
+        dest_group_layout = qt_widgets.QVBoxLayout()
+        dest_group_box = qt_widgets.QGroupBox("Destination")
+        dest_group_box.setLayout(dest_group_layout)
+        src_dest_group_layout.addWidget(dest_group_box, alignment=Qt.AlignTop)
+        # Add source and destination buttons to respective groups
+        for platform in self.platforms:
+            self.src_buttons[platform].clicked.connect(self.update_hidden_buttons)
+            src_group_layout.addWidget(self.src_buttons[platform])
+            dest_group_layout.addWidget(self.dest_buttons[platform])
+        return
+
+    def create_job_group(self):
+        job_group_layout = qt_widgets.QVBoxLayout()
+        job_group_box = qt_widgets.QGroupBox("Step 2. Select what you want to convert")
+        job_group_box.setLayout(job_group_layout)
+        self.window_layout.addWidget(job_group_box)
+        for job in self.jobs_buttons:
+            job_button = self.jobs_buttons[job]
+            job_button.clicked.connect(self.update_hidden_buttons)
+            job_group_layout.addWidget(job_button, alignment=Qt.AlignTop)
+        playlist_URL_group_layout = qt_widgets.QVBoxLayout()
+        self.playlist_URL_group_box.hide()
+        self.playlist_URL_group_box.setLayout(playlist_URL_group_layout)
+        playlist_URL_group_layout.addWidget(self.playlist_URL_textbox, alignment=Qt.AlignTop)
+        job_group_layout.addWidget(self.playlist_URL_group_box)
+        return
+
+    def create_options_group(self):
+        options_group_layout = qt_widgets.QVBoxLayout()
+        options_group_box = qt_widgets.QGroupBox("Step 3. Additional options")
+        options_group_box.setLayout(options_group_layout)
+        self.window_layout.addWidget(options_group_box)
+        for option in self.options:
+            option_button = self.options_buttons[option]
+            option_button.clicked.connect(self.update_hidden_buttons)
+            options_group_layout.addWidget(option_button, alignment=Qt.AlignTop)
+        return
+
+    def create_convert_button(self):
+        self.window_layout.addWidget(self.convert_button, alignment=Qt.AlignBottom)
+        self.convert_button.clicked.connect(self.get_arguments)
+        return
+
+    '''
+    Create GUI Window
+    '''
+    def create_window(self):
+        self.window.setLayout(self.window_layout)
         self.set_dark_theme()
         self.set_window_title()
         self.set_window_dimensions()
-
-        self.platforms = ["Spotify", "YouTube Music", "Apple Music"]
-        self.src_dest_buttons = {
-            platform: {
-                "Source": qt_widgets.QRadioButton(platform),
-                "Destination": qt_widgets.QRadioButton(platform)
-            }
-            for platform in self.platforms
-        }
-        
-        ''' 
-        Params:
-        - job (src and dest)
-        - keep_dupes
-        - download
-        - playlist URL
-        '''
-        self.src_dest_group_layout = qt_widgets.QVBoxLayout()
-        self.src_dest_group_box = qt_widgets.QGroupBox("Select conversion source")
-        self.src_dest_group_box.setLayout(self.src_dest_group_layout)
-        self.window_layout.addWidget(self.src_dest_group_box)
-
-        self.src_group_layout = qt_widgets.QVBoxLayout()
-        self.src_group_box = qt_widgets.QGroupBox("Source")
-        self.src_group_box.setLayout(self.src_group_layout)
-        self.src_dest_group_layout.addWidget(self.src_group_box, alignment=Qt.AlignTop)
-
-        self.dest_group_layout = qt_widgets.QVBoxLayout()
-        self.dest_group_box = qt_widgets.QGroupBox("Destination")
-        self.dest_group_box.setLayout(self.dest_group_layout)
-
-        self.src_dest_group_layout.addWidget(self.dest_group_box, alignment=Qt.AlignTop)
-
-        self.utils_group_layout = qt_widgets.QVBoxLayout()
-        self.utils_group_box = qt_widgets.QGroupBox("Options")
-        self.utils_group_box.setLayout(self.utils_group_layout)
-        self.window_layout.addWidget(self.utils_group_box)
-
-        self.keep_dupes_button = qt_widgets.QCheckBox("Should we keep duplicates?")
-        self.utils_group_layout.addWidget(self.keep_dupes_button, alignment=Qt.AlignTop)
-
-        self.downloads_button = qt_widgets.QCheckBox("Should we download YouTube Music videos that cannot be found?")
-        self.utils_group_layout.addWidget(self.downloads_button, alignment=Qt.AlignTop)
-
-        self.window_layout.addStretch()
-
-        self.convert_button = qt_widgets.QPushButton("CONVERT")
-        self.window_layout.addWidget(self.convert_button)
-
-        self.set_src_dest_buttons()
-
-        self.window.setLayout(self.window_layout)
         self.window.show()
-        self.app.exec()
-        pass
+        return
 
     def set_dark_theme(self) -> None:
         self.app.setStyle("Fusion")
@@ -94,33 +139,36 @@ class ConverterGUI():
 
     def set_window_dimensions(self):
         screen = self.app.primaryScreen()
-        start_x= screen.size().width() // 4
-        start_y = screen.size().height() // 3
-        width = 700
+        start_x= screen.size().width() // 3
+        start_y = screen.size().height() // 4
+        width = 500
         height = 500
         self.window.setGeometry(start_x, start_y, width, height)
         return
 
-    def set_src_dest_buttons(self):
-        for platform in self.src_dest_buttons:
-            src_button = self.src_dest_buttons[platform]["Source"]
-            dest_button = self.src_dest_buttons[platform]["Destination"]
-            src_button.clicked.connect(self.update_buttons)
-            self.src_group_layout.addWidget(src_button)
-            self.dest_group_layout.addWidget(dest_button)
-        return
-
-    def update_buttons(self):
-        for platform in self.src_dest_buttons:
-            self.src_dest_buttons[platform]["Source"].show()
-            self.src_dest_buttons[platform]["Destination"].show()
-        for platform in self.src_dest_buttons:
-            if self.src_dest_buttons[platform]["Source"].isChecked():
-                self.src_dest_buttons[platform]["Destination"].hide()
-                if self.src_dest_buttons[platform]["Source"].text() == "YouTube Music":
+    '''
+    Helper functions: Utils
+    '''
+    def update_hidden_buttons(self):
+        # Hide opposite destination of currently selected source
+        for platform in self.platforms:
+            if self.src_buttons[platform].isChecked():
+                self.dest_buttons[platform].hide()
+                # Hide downloads button if source != YouTube Music
+                if platform == "YouTube Music":
                     self.downloads_button.show()
                 else:
                     self.downloads_button.hide()
+            else:
+                self.dest_buttons[platform].show()
+        # Hide playlist URL box if job != playlist
+        if self.jobs_buttons["Playlist"].isChecked():
+            self.playlist_URL_group_box.show()
+        else:
+            self.playlist_URL_group_box.hide()
         return
 
-converter_GUI = ConverterGUI() 
+    def get_arguments(self):
+        return
+
+converter_GUI = ConverterGUI()
