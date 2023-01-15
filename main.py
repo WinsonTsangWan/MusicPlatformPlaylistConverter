@@ -3,6 +3,7 @@ start_time = time.time()
 import spotipy
 import urllib
 import logging
+import requests
 import os
 os.system("")
 
@@ -12,30 +13,32 @@ from spotipy.oauth2 import SpotifyOAuth
 from spotipy.oauth2 import SpotifyClientCredentials
 from ytmusicapi import YTMusic
 from termcolor import colored
-from dotenv import load_dotenv
+from dotenv import load_dotenv, dotenv_values
 load_dotenv()
-# YTMusic.setup(filepath="headers_auth.json")
 
 ''' YTM_CLIENT: unofficial YouTube Music API (ytmusicapi library) client '''
+# YTMusic.setup('headers_auth.json')
 YTM_CLIENT = YTMusic('headers_auth.json')
 
-''' SP_CLIENT: (Original Method) Spotify API client with scope SP_SCOPE '''
-# SP_SCOPE = "playlist-read-private playlist-modify-private user-library-read user-library-modify"
-# SP_CLIENT = spotipy.Spotify(auth_manager=SpotifyOAuth(scope=SP_SCOPE))
-
-''' SP_CLIENT: (Authorization Code Flow) Spotify API client with scopes SP_SCOPE '''
+''' SP_CLIENT: authorization code flow'''
 SP_SCOPE = "playlist-read-private playlist-modify-private user-library-read user-library-modify"
-SP_TOKEN = spotipy.util.prompt_for_user_token(scope=SP_SCOPE)
-SP_CLIENT = spotipy.Spotify(auth=SP_TOKEN)
+SP_AUTH_MANAGER = SpotifyOAuth(scope=SP_SCOPE)
+SP_AUTH_URL = "https://accounts.spotify.com/api/token"
+SP_AUTH_DATA = {
+    'grant_type': 'client_credentials',
+    'client_id': dotenv_values("SPOTIPY_CLIENT_ID"),
+    'client_secret': dotenv_values("SPOTIPY_REDIRECT_URI"),
+}
+SP_AUTH_RESPONSE = requests.post(SP_AUTH_URL, data=SP_AUTH_DATA)
+SP_AUTH_TOKEN = SP_AUTH_RESPONSE.json().get("access_token")
+print("SP_AUTH_TOKEN = ", SP_AUTH_TOKEN)
+SP_CLIENT = spotipy.Spotify(SP_AUTH_TOKEN)
 
 # TODO:
-# 0. [DONE] add README file
-# 0. [DONE] write print errors to log file
-# 1. fix authorization for Spotify 
+# 1. fix authorization for Spotify
 # 2. fix authorization for YouTube Music (use Google API instead of unofficial ytmusicapi)
-# 3. create GUI for easier user input handling
-#    - job, keep_dupes, source, destination, download_yt_videos if source is yt
-#    - add Spotify liked songs to YouTube Music liked videos or separate playlist
+# 3. create web app for easier input handling -> host on github pages
+# 4. use acr cloud api to handle song matching
 # 4. [MOSTLY DONE] improve find_best_match() algorithm for matching search results with query:
 #    - for video results, search only the video title (instead of simply skipping and not adding)
 

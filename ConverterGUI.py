@@ -1,19 +1,28 @@
 import PyQt5.QtWidgets as qt_widgets
-
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QPalette, QColor
 
+import logging
+import urllib
+import spotipy
+from SpotifyConverterClass import SpotifyConverter
+from YouTubeConverterClass import YouTubeMusicConverter
+from ytmusicapi import YTMusic
+from dotenv import load_dotenv
+load_dotenv()
 
 class ConverterGUI():
     def __init__(self) -> None:
+        self.ytm_client = None
+        self.sp_client = None
+
         self.app = qt_widgets.QApplication([])
         self.window = qt_widgets.QWidget()
         self.window_layout = qt_widgets.QVBoxLayout()
-        self.create_window()
 
         self.ytmusic_auth_textbox = qt_widgets.QLineEdit("")
 
-        self.platforms = ["Spotify", "YouTube Music", "Apple Music"]
+        self.platforms = ["Spotify", "YouTube Music"]
         self.src_buttons = {platform: qt_widgets.QRadioButton(platform) for platform in self.platforms}
         self.dest_buttons = {platform: qt_widgets.QRadioButton(platform) for platform in self.platforms}
         
@@ -26,16 +35,15 @@ class ConverterGUI():
         self.options_buttons = {option: qt_widgets.QCheckBox(option) for option in self.options}
         self.keep_dupes_button = self.options_buttons["Keep duplicates"]
         self.downloads_button = self.options_buttons["Download YouTube videos and songs that cannot be found"]
-        self.downloads_button.hide()
 
         self.convert_button = qt_widgets.QPushButton("\nCONVERT\n")
 
+        self.create_window()
         self.create_ytmusic_auth_group()
         self.create_src_dest_group()
         self.create_job_group()
         self.create_options_group()
         self.create_convert_button()
-
         self.app.exec()
         pass
 
@@ -95,6 +103,7 @@ class ConverterGUI():
             option_button = self.options_buttons[option]
             option_button.clicked.connect(self.update_hidden_buttons)
             options_group_layout.addWidget(option_button, alignment=Qt.AlignTop)
+        self.downloads_button.hide()
         return
 
     def create_convert_button(self):
@@ -169,6 +178,121 @@ class ConverterGUI():
         return
 
     def get_arguments(self):
+        args= {}
+        args["ytm_auth"] = self.ytmusic_auth_textbox.text()
+        args["source"] = [src for src in self.src_buttons if self.src_buttons[src].isChecked()][0]
+        args["dest"] = [dest for dest in self.dest_buttons if self.dest_buttons[dest].isChecked()][0]
+        args["job"] = [job for job in self.jobs_buttons if self.jobs_buttons[job].isChecked()][0]
+        args["playlist_url"] = self.playlist_URL_textbox.text()
+        args["keep_dupes"] = self.keep_dupes_button.isChecked()
+        args["downloads"] = self.downloads_button.isChecked()
+        self.GUI_convert(args)
+        return
+    
+    def GUI_convert(self, args):
+        logging.basicConfig(
+            filename="log.log", 
+            level=logging.INFO,
+            format=u"%(message)s",
+            filemode="w",
+            encoding="utf-8"
+        )
+
+        # try:
+        #     self.sp_client = self.do_spotify_auth()
+        # except:
+        #     self.error_message("Failed Spotify authentication")
+        #     return
+        # try:
+        #     self.ytm_client = self.do_youtube_auth(args["ytm_auth"])
+        # except:
+        #     self.error_message("Invalid YouTube Music authentication")
+        #     return
+
+        self.ytm_client = YTMusic('headers_auth.json')
+
+        SP_SCOPE = "playlist-read-private playlist-modify-private user-library-read user-library-modify"
+        SP_TOKEN = spotipy.util.prompt_for_user_token(scope=SP_SCOPE)
+        self.sp_client = spotipy.Spotify(auth=SP_TOKEN)
+
+        if args["job"] == "Playlist":
+            parsed_URL = self.get_playlist_URL(args["playlist_URL"])
+            if parsed_URL:
+                netloc = parsed_URL.netloc
+                path = parsed_URL.path
+                query = parsed_URL.query
+                if args["source"] == "Spotify":
+                    if netloc == "open.spotify.com" and path[:10] == "/playlist/":
+                        sp_playlist_ID = path[10:]
+                        self.do_playlist_spotify(sp_playlist_ID, args["keep_dupes"])
+                    else:
+                        self.error_message("Make sure the URL leads to a Spotify playlist")
+                elif args["source"] == "YouTube Music":
+                    if netloc == "music.youtube.com" and path == "/playlist":
+                        yt_playlist_ID = query[5:]
+                        self.do_playlist_youtube(yt_playlist_ID, args["keep_dupes"], args["downloads"])
+                    else:
+                        self.error_message("Make sure the URL leads to a YouTube Music playlist")
+        elif args["job"] == "Library":
+            if args["source"] == "Spotify":
+                self.do_library_spotify(args["keep_dupes"])
+            elif args["source"] == "YouTube Music":
+                self.do_library_youtube(args["keep_dupes"], args["downloads"])
+        return
+
+    def get_playlist_URL(self, input_URL):
+        try:
+            parsed_URL = urllib.parse.urlparse(input_URL)
+        except:
+            self.error_message("Invalid playlist URL")
+            return
+        if parsed_URL.netloc != "open.spotify.com" and parsed_URL.netloc != "music.youtube.com":
+            self.error_message("Invalid playlist URL")
+            return
+        return parsed_URL
+
+    def do_spotify_auth(self):
+        SP_SCOPE = "playlist-read-private playlist-modify-private user-library-read user-library-modify"
+        SP_TOKEN = spotipy.util.prompt_for_user_token(scope=SP_SCOPE)
+        SP_CLIENT = spotipy.Spotify(auth=SP_TOKEN)
+        return SP_CLIENT
+
+    def do_youtube_auth(self, ytm_auth):
+        YTMusic.setup(ytm_auth)
+        YTM_CLIENT = YTMusic('headers_auth.json')
+        return YTM_CLIENT
+
+    def error_message(self, message):
+        error_message = qt_widgets.QMessageBox()
+        error_message.setText(f"ERROR: {message}")
+        error_message.exec()
+        return
+
+    def do_playlist_spotify(self, sp_playlist_ID: str, keep_dupes: bool) -> None:
+        self.error_message("SUCCESS DO PLAYLIST SPOTIFY")
+        # sp_converter = SpotifyConverter(self.ytm_client, self.sp_client, keep_dupes)
+        # sp_converter.convert_SP_to_YT_playlist(sp_playlist_ID)
+        # sp_converter.print_not_added_songs()
+        return
+
+    def do_playlist_youtube(self, yt_playlist_ID: str, keep_dupes: bool, downloads: bool) -> None:
+        self.error_message("SUCCESS DO PLAYLIST YOUTUBE")
+        # yt_converter = YouTubeMusicConverter(self.ytm_client, self.sp_client, keep_dupes, downloads)
+        # yt_converter.convert_YT_to_SP_playlist(yt_playlist_ID)
+        # yt_converter.print_not_added_songs()
+        # yt_converter.download_YT_videos()
+        return
+    
+    def do_library_spotify(self, keep_dupes: bool) -> None:
+        self.error_message("SUCCESS DO LIBRARY SPOTIFY")
+        # sp_converter = SpotifyConverter(self.ytm_client, self.sp_client, keep_dupes)
+        # sp_converter.convert_SP_to_YT_library()
+        return
+
+    def do_library_youtube(self, keep_dupes: bool, downloads: bool) -> None:
+        self.error_message("SUCCESS DO LIBRARY YOUTUBE")
+        # yt_converter = YouTubeMusicConverter(self.ytm_client, self.sp_client, keep_dupes, downloads)
+        # yt_converter.convert_YT_to_SP_library()
         return
 
 converter_GUI = ConverterGUI()
