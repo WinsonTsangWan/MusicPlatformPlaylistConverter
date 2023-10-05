@@ -1,6 +1,6 @@
-# Spotify-to-YouTubeMusic Converter
+# Music Platform Playlist Converter
 
-Spotify-to-YouTubeMusic Converter is a console application used to transfer Spotify playlists to YouTube Music and vice versa.
+Music Platform Playlist Converter Converter is a console application used to transfer Spotify playlists to YouTube Music and vice versa.
 
 ## Usage
 
